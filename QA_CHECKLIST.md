@@ -91,6 +91,15 @@ Every build must pass ALL checks before shipping. Run on Pixel 8 Pro (or equival
 - [ ] **M11. Task with wrong app name**: "send hi on Watsapp" (typo) → Cloud LLM figures out it means WhatsApp → still works
 - [ ] **M12. Ambiguous task**: "play music" → Cloud LLM picks a music app → opens it → tries to play something
 
+## N. Tinder Automation
+
+- [ ] **N1. Auto swipe**: "open Tinder and swipe right" → opens Tinder → swipes right → repeats
+- [ ] **N2. Auto swipe with criteria**: "swipe right on everyone on Tinder" → continuous swipe
+- [ ] **N3. Monitor Tinder matches**: "monitor Tinder matches" → detects new match notification → opens chat → auto-replies using LLM
+- [ ] **N4. Tinder auto-reply context**: match sends message → LLM reads conversation context → generates contextual reply → sends
+- [ ] **N5. Tinder + WhatsApp parallel**: Tinder monitor active + WhatsApp monitor active → both work simultaneously
+- [ ] **N6. Stop Tinder monitor**: tap monitoring bar → Stop → Tinder monitoring stops, WhatsApp unaffected
+
 ## L. Task Auto-Return
 
 - [ ] **L1. Auto-return after send message**: "send hi to Girlfriend on WhatsApp" → agent opens WhatsApp → sends → completes → PokeClaw chatroom comes back to foreground

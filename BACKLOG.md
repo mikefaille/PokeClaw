@@ -13,6 +13,7 @@ Priority: `P0` = blocks users, fix now. `P1` = next up. `P2` = when we get to it
 
 ## Features
 
+- [ ] **P1** Tinder automation: auto swipe + monitor matches + auto-reply using same monitor architecture as WhatsApp
 - [ ] **P1** NLP Playbooks (Layer 2): natural language step-by-step instructions for common tasks (Send WhatsApp, Compose Email, etc.) — injected into system prompt so LLM follows a reliable path
 - [x] ~~**P1** In-chat task auto-return~~ — done 2026-04-08
 - [x] ~~**P2** Monitor stays in app~~ — done 2026-04-08, removed GLOBAL_ACTION_HOME
