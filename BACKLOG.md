@@ -14,8 +14,8 @@ Priority: `P0` = blocks users, fix now. `P1` = next up. `P2` = when we get to it
 ## Features
 
 - [ ] **P1** NLP Playbooks (Layer 2): natural language step-by-step instructions for common tasks (Send WhatsApp, Compose Email, etc.) — injected into system prompt so LLM follows a reliable path
-- [ ] **P1** In-chat task auto-return: when task completes in another app, navigate back to PokeClaw chatroom
-- [ ] **P2** Monitor should NOT jump to homepage: test if ClawNotificationListener catches notifications without pressing Home
+- [x] ~~**P1** In-chat task auto-return~~ — done 2026-04-08
+- [x] ~~**P2** Monitor stays in app~~ — done 2026-04-08, removed GLOBAL_ACTION_HOME
 - [ ] **P2** Unified task registry: monitor + agent tasks tracked in same system (top bar, floating button, etc.)
 - [ ] **P3** Rename chat session (H6): pencil icon in sidebar → InputDialog → update title in DB + markdown
 - [ ] **P3** Floating button: use PokeClaw icon instead of "AI" text
