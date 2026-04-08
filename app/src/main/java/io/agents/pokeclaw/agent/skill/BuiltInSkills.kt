@@ -135,10 +135,12 @@ object BuiltInSkills {
             SkillStep("input_text", mapOf("text" to "{contact}"), description = "Search for contact"),
             SkillStep("wait", mapOf("duration_ms" to "1000"), description = "Wait for search results"),
             SkillStep("find_and_tap", mapOf("text" to "{contact}"), description = "Tap contact from results"),
-            SkillStep("wait", mapOf("duration_ms" to "1000"), description = "Wait for chat"),
+            SkillStep("wait", mapOf("duration_ms" to "2000"), description = "Wait for chat to open"),
+            SkillStep("system_key", mapOf("key" to "back"), description = "Dismiss keyboard/search"),
+            SkillStep("wait", mapOf("duration_ms" to "500"), description = "Brief pause"),
+            SkillStep("find_and_tap", mapOf("text" to "Type a message"), description = "Tap message input", optional = true),
             SkillStep("input_text", mapOf("text" to "{message}"), description = "Type message"),
             SkillStep("find_and_tap", mapOf("text" to "Send"), description = "Tap send", optional = true),
-            SkillStep("system_key", mapOf("key" to "enter"), description = "Submit message"),
         ),
         fallbackGoal = "In WhatsApp, find contact '{contact}' and send message: {message}"
     )
