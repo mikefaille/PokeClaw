@@ -41,7 +41,14 @@ class AppViewModel : ViewModel() {
 
     // ==================== Task API (clean interface for Activity) ====================
 
+    /**
+     * Called before a task starts — allows the chat UI to release its local LLM conversation
+     * so the task agent can use the same LiteRT-LM engine (only 1 session supported).
+     */
+    var onBeforeTask: (() -> Unit)? = null
+
     fun startTask(task: String, taskId: String, onEvent: (TaskEvent) -> Unit) {
+        onBeforeTask?.invoke()
         taskOrchestrator.taskEventCallback = onEvent
         taskOrchestrator.startNewTask(Channel.LOCAL, task, taskId)
     }

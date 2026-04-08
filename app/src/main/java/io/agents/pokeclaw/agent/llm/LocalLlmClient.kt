@@ -46,20 +46,38 @@ class LocalLlmClient(private val config: AgentConfig) : LlmClient {
     private var conversation: com.google.ai.edge.litertlm.Conversation? = null
     private var processedMessageCount = 0
 
+    private var gpuFailed = false
+
     private fun ensureEngine() {
         val modelPath = config.baseUrl
         val context = ClawApplication.instance
+        // If GPU previously failed during inference, force CPU
+        val backend = if (gpuFailed) com.google.ai.edge.litertlm.Backend.CPU() else com.google.ai.edge.litertlm.Backend.GPU()
 
         try {
-            val shared = EngineHolder.getOrCreate(modelPath, context.cacheDir.path)
+            val shared = EngineHolder.getOrCreate(modelPath, context.cacheDir.path, backend)
             if (engine !== shared) {
-                XLog.i(TAG, "ensureEngine: obtained shared engine for $modelPath")
+                XLog.i(TAG, "ensureEngine: obtained shared engine for $modelPath (${backend.javaClass.simpleName})")
                 engine = shared
             }
         } catch (e: Exception) {
             XLog.e(TAG, "ensureEngine: failed to get engine from EngineHolder", e)
             throw e
         }
+    }
+
+    /**
+     * Force engine to recreate with CPU backend. Called when GPU inference fails
+     * (e.g. OpenCL library not found).
+     */
+    private fun fallbackToCpu() {
+        XLog.w(TAG, "fallbackToCpu: GPU inference failed, switching to CPU")
+        gpuFailed = true
+        try { conversation?.close() } catch (_: Exception) {}
+        conversation = null
+        EngineHolder.close()
+        engine = null
+        ensureEngine()
     }
 
     /**
@@ -91,32 +109,55 @@ class LocalLlmClient(private val config: AgentConfig) : LlmClient {
         XLog.i(TAG, "createConversation: ${nativeTools.size} native tools")
 
         val eng = engine ?: throw RuntimeException("LiteRT-LM engine not initialized — check model path: ${config.baseUrl}")
-        conversation = eng.createConversation(
-            ConversationConfig(
-                systemInstruction = Contents.of(systemPrompt),
-                tools = nativeTools,
-                samplerConfig = SamplerConfig(
-                    topK = 64,
-                    topP = 0.95,
-                    temperature = config.temperature
-                ),
-                automaticToolCalling = false  // We handle execution in DefaultAgentService
-            )
+        val convConfig = ConversationConfig(
+            systemInstruction = Contents.of(systemPrompt),
+            tools = nativeTools,
+            samplerConfig = SamplerConfig(
+                topK = 64,
+                topP = 0.95,
+                temperature = config.temperature
+            ),
+            automaticToolCalling = false  // We handle execution in DefaultAgentService
         )
-        processedMessageCount = 0
+
+        // Retry with backoff — another client (chat UI) may still be closing its session
+        var lastError: Exception? = null
+        for (attempt in 1..5) {
+            try {
+                conversation = eng.createConversation(convConfig)
+                processedMessageCount = 0
+                return
+            } catch (e: Exception) {
+                lastError = e
+                XLog.w(TAG, "createConversation attempt $attempt failed: ${e.message}")
+                if (attempt < 5) Thread.sleep(1500)
+            }
+        }
+        throw RuntimeException("Failed to create conversation after 5 retries: ${lastError?.message}", lastError)
     }
 
     private var sendCount = 0
 
     override fun chat(messages: List<ChatMessage>, toolSpecs: List<ToolSpecification>): LlmResponse {
+        return try {
+            chatInternal(messages, toolSpecs)
+        } catch (e: Exception) {
+            // GPU inference failure (OpenCL not found) — fallback to CPU and retry once
+            if (!gpuFailed && e.message?.contains("OpenCL") == true) {
+                XLog.w(TAG, "chat: GPU inference failed, retrying with CPU: ${e.message}")
+                fallbackToCpu()
+                chatInternal(messages, toolSpecs)
+            } else {
+                throw e
+            }
+        }
+    }
+
+    private fun chatInternal(messages: List<ChatMessage>, toolSpecs: List<ToolSpecification>): LlmResponse {
         ensureEngine()
 
         // Detect new task or recreate needed
         if (processedMessageCount == 0 || messages.size < processedMessageCount || sendCount >= 8) {
-            // Recreate conversation every 8 sends to avoid SIGSEGV on sequential calls.
-            // This is a workaround for LiteRT-LM bug in sequential sendMessage.
-            // Use the full system prompt from agent config so the LLM retains all
-            // skill instructions and rules after conversation recreation.
             val systemPrompt = messages.filterIsInstance<SystemMessage>().firstOrNull()?.text()
                 ?: config.systemPrompt.ifEmpty { LOCAL_SYSTEM_PROMPT }
             createConversation(systemPrompt, toolSpecs)

@@ -178,6 +178,14 @@ class ComposeChatActivity : ComponentActivity() {
         loadSidebarHistory()
         loadModelIfReady()
 
+        // Release local LLM conversation before task starts so the agent can use the engine
+        // (LiteRT-LM only supports 1 session at a time)
+        appViewModel.onBeforeTask = {
+            try { conversation?.close() } catch (_: Exception) {}
+            conversation = null
+            isModelReady = false
+        }
+
         // Debug: auto-trigger task from ADB intent
         // Usage: adb shell am start -n io.agents.pokeclaw/.ui.chat.ComposeChatActivity --es task "open my camera"
         intent?.getStringExtra("task")?.let { taskText ->
@@ -515,16 +523,23 @@ class ComposeChatActivity : ComponentActivity() {
     private var sendTaskRetryCount = 0
 
     private fun sendTask(text: String) {
+        // Java keyword routing FIRST — monitor/auto-reply don't need accessibility service
+        val lower = text.lowercase()
+        if (lower.contains("monitor") || lower.contains("auto-reply") || lower.contains("auto reply")
+            || lower.contains("watch") && (lower.contains("message") || lower.contains("reply"))) {
+            handleMonitorTask(text)
+            return
+        }
+
+        // Accessibility check — only for tasks that need phone control (agent loop)
         if (!ClawAccessibilityService.isRunning()) {
             if (!ClawAccessibilityService.isEnabledInSettings(this)) {
-                // Not enabled at all — send user to settings
                 addSystem("Task mode needs Accessibility permission to control your phone.")
                 startActivity(Intent(android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS))
                 Toast.makeText(this, "Enable PokeClaw in Accessibility settings", Toast.LENGTH_LONG).show()
                 sendTaskRetryCount = 0
                 return
             }
-            // Enabled but still binding — wait briefly on background thread (max 1 retry)
             if (sendTaskRetryCount >= 1) {
                 addSystem("Accessibility service didn't connect. Try toggling it off and on in Settings > Accessibility.")
                 sendTaskRetryCount = 0
@@ -552,14 +567,6 @@ class ComposeChatActivity : ComponentActivity() {
 
         // Reset stuck processing state from previous task
         _isProcessing.value = false
-
-        // Java keyword routing: monitor/auto-reply tasks bypass LLM entirely
-        val lower = text.lowercase()
-        if (lower.contains("monitor") || lower.contains("auto-reply") || lower.contains("auto reply")
-            || lower.contains("watch") && (lower.contains("message") || lower.contains("reply"))) {
-            handleMonitorTask(text)
-            return
-        }
 
         if (!KVUtils.hasLlmConfig()) {
             Toast.makeText(this, "Configure LLM in Settings first", Toast.LENGTH_LONG).show()

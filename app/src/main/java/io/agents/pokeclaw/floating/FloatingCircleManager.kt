@@ -148,6 +148,8 @@ object FloatingCircleManager {
 
                 override fun show(view: View) {
                     isShowing = true
+                    // Restore UI state when overlay reappears after app switch
+                    updateStateView(view, currentState)
                 }
 
                 override fun touchEvent(view: View, event: MotionEvent) {
