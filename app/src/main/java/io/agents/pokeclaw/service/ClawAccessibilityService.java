@@ -5,7 +5,9 @@ package io.agents.pokeclaw.service;
 
 import android.accessibilityservice.AccessibilityService;
 import android.accessibilityservice.GestureDescription;
+import android.content.Context;
 import android.content.Intent;
+import android.provider.Settings;
 import android.graphics.Bitmap;
 import android.graphics.Path;
 import android.graphics.Rect;
@@ -38,6 +40,27 @@ public class ClawAccessibilityService extends AccessibilityService {
 
     public static boolean isRunning() {
         return instance != null;
+    }
+
+    /**
+     * Checks whether PokeClaw is enabled in Android's Accessibility settings.
+     * This does NOT mean the service is connected — use {@link #isRunning()} for that.
+     * Use this to distinguish "not enabled" (user action needed) from "enabled but
+     * still binding" (just wait).
+     */
+    public static boolean isEnabledInSettings(Context context) {
+        try {
+            String enabledServices = Settings.Secure.getString(
+                    context.getContentResolver(),
+                    Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES);
+            if (enabledServices == null || enabledServices.isEmpty()) return false;
+            String myService = context.getPackageName() + "/"
+                    + ClawAccessibilityService.class.getName();
+            return enabledServices.contains(myService);
+        } catch (Exception e) {
+            XLog.e(TAG, "Failed to check accessibility settings", e);
+            return false;
+        }
     }
 
     /**

@@ -27,7 +27,14 @@ class ChannelSetup(
         ChannelManager.setOnMessageReceivedListener(object : ChannelManager.OnMessageReceivedListener {
             override fun onMessageReceived(channel: Channel, message: String, messageID: String) {
                 val app = ClawApplication.instance
+                if (!ClawAccessibilityService.isEnabledInSettings(app)) {
+                    // Not enabled at all — tell user to enable, no point waiting
+                    ChannelManager.sendMessage(channel, "Accessibility service is not enabled. Please enable PokeClaw in Settings > Accessibility.", messageID)
+                    ChannelManager.flushMessages(channel)
+                    return
+                }
                 if (!ClawAccessibilityService.awaitRunning(3000)) {
+                    // Enabled but not connected after 3s — may need restart
                     ChannelManager.sendMessage(channel, app.getString(R.string.channel_msg_no_accessibility), messageID)
                     ChannelManager.flushMessages(channel)
                     return
