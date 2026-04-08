@@ -3,6 +3,7 @@
 
 package io.agents.pokeclaw.tool
 
+import io.agents.pokeclaw.agent.knowledge.*
 import io.agents.pokeclaw.tool.impl.*
 import io.agents.pokeclaw.tool.impl.mobile.*
 import io.agents.pokeclaw.tool.impl.tv.*
@@ -41,6 +42,12 @@ object ToolRegistry {
         register(ClipboardTool())
         register(SendFileTool())
         register(FinishTool())
+        // Knowledge Base tools — shared vault available in all modes
+        register(KbWriteTool())
+        register(KbReadTool())
+        register(KbSearchTool())
+        register(KbAppendTool())
+        register(KbAddTodoTool())
     }
 
     private fun registerTvTools() {
