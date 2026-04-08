@@ -570,51 +570,295 @@ public class AutoReplyManager {
 
     /**
      * Type and send a message when already inside the chatroom.
-     * Much faster than SendMessageTool (no need to open app + find contact).
+     *
+     * Strategy: try generic Java path first (fast, works 90% of the time),
+     * fall back to LLM-assisted UI interaction if Java path fails.
+     * This makes it app-agnostic — no per-app code needed.
      */
     private ToolResult typeAndSendInOpenChat(ClawAccessibilityService service, String message) {
         try {
-            // Find bottom EditText and type
             AccessibilityNodeInfo root = service.getRootInActiveWindow();
             if (root == null) return ToolResult.error("No active window");
 
+            // Step 1: Find input field — generic (bottom-most EditText)
             java.util.List<AccessibilityNodeInfo> editables = new java.util.ArrayList<>();
             collectEditTexts(root, editables);
 
-            AccessibilityNodeInfo best = null;
+            AccessibilityNodeInfo inputField = null;
             int bestY = -1;
             for (AccessibilityNodeInfo node : editables) {
                 android.graphics.Rect bounds = new android.graphics.Rect();
                 node.getBoundsInScreen(bounds);
                 if (bounds.centerY() > bestY) {
                     bestY = bounds.centerY();
-                    best = node;
+                    inputField = node;
                 }
             }
-            if (best == null) return ToolResult.error("No input field found");
 
-            best.performAction(AccessibilityNodeInfo.ACTION_CLICK);
+            if (inputField == null) {
+                // No EditText found — fall back to LLM to find input + send
+                XLog.i(TAG, "typeAndSend: no EditText found, falling back to LLM");
+                return typeAndSendViaLlm(service, message);
+            }
+
+            // Step 2: Type the message
+            inputField.performAction(AccessibilityNodeInfo.ACTION_CLICK);
             Thread.sleep(300);
             android.os.Bundle args = new android.os.Bundle();
             args.putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, message);
-            best.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args);
+            inputField.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args);
             Thread.sleep(500);
 
-            // Find and tap send button by content description
+            // Step 3: Find send button — try multiple generic patterns
+            root = service.getRootInActiveWindow();
+            if (root == null) root = service.getRootInActiveWindow();
+
             AccessibilityNodeInfo sendBtn = findNodeByDesc(root, "send");
+            if (sendBtn == null) sendBtn = findNodeByDesc(root, "Send");
+            // Some apps use a specific resource ID pattern
+            if (sendBtn == null) sendBtn = findClickableByPartialId(root, "send");
+
             if (sendBtn != null) {
                 service.clickNode(sendBtn);
                 return ToolResult.success("Sent in open chat: " + message);
             }
 
-            // Fallback: press Enter
-            Runtime.getRuntime().exec(new String[]{"input", "keyevent", "66"}).waitFor();
-            return ToolResult.success("Sent via Enter: " + message);
+            // Java send button search failed — ask LLM to find it
+            XLog.i(TAG, "typeAndSend: send button not found by Java, asking LLM");
+            return tapSendViaLlm(service, message);
 
         } catch (Exception e) {
             XLog.e(TAG, "typeAndSendInOpenChat failed", e);
             return ToolResult.error("Failed: " + e.getMessage());
         }
+    }
+
+    /**
+     * LLM-assisted: ask the LLM to find the send button on the current screen.
+     * Single targeted LLM call — NOT a full agent loop. Fast (~2s).
+     */
+    private ToolResult tapSendViaLlm(ClawAccessibilityService service, String alreadyTypedMessage) {
+        try {
+            // Read current screen as text
+            io.agents.pokeclaw.tool.impl.GetScreenInfoTool screenTool = new io.agents.pokeclaw.tool.impl.GetScreenInfoTool();
+            io.agents.pokeclaw.tool.ToolResult screenResult = screenTool.execute(java.util.Collections.emptyMap());
+            if (!screenResult.isSuccess() || screenResult.getData() == null) {
+                // Last resort: press Enter
+                Runtime.getRuntime().exec(new String[]{"input", "keyevent", "66"}).waitFor();
+                return ToolResult.success("Sent via Enter (screen read failed): " + alreadyTypedMessage);
+            }
+
+            String screenText = screenResult.getData();
+            String prompt = "I already typed a message in the chat input field. " +
+                "Now I need to tap the SEND button to send it.\n\n" +
+                "Current screen:\n" + screenText + "\n\n" +
+                "Which element is the send button? Reply with ONLY the node ID (e.g., n5) or coordinates (e.g., 950,2100). Nothing else.";
+
+            String response = singleLlmCall(prompt);
+            if (response == null || response.isEmpty()) {
+                Runtime.getRuntime().exec(new String[]{"input", "keyevent", "66"}).waitFor();
+                return ToolResult.success("Sent via Enter (LLM empty): " + alreadyTypedMessage);
+            }
+
+            // Parse response — expect "n5" or "950,2100"
+            response = response.trim().replaceAll("[\"'`]", "");
+            if (response.startsWith("n")) {
+                // Node ID — use tap_node tool
+                io.agents.pokeclaw.tool.ToolRegistry registry = io.agents.pokeclaw.tool.ToolRegistry.getInstance();
+                java.util.Map<String, Object> params = new java.util.HashMap<>();
+                params.put("node_id", response);
+                registry.executeTool("tap_node", params);
+                return ToolResult.success("Sent via LLM node tap: " + alreadyTypedMessage);
+            } else if (response.contains(",")) {
+                // Coordinates
+                String[] parts = response.split(",");
+                int x = Integer.parseInt(parts[0].trim());
+                int y = Integer.parseInt(parts[1].trim());
+                service.performTap(x, y);
+                return ToolResult.success("Sent via LLM coordinate tap: " + alreadyTypedMessage);
+            }
+
+            // Can't parse — fallback Enter
+            Runtime.getRuntime().exec(new String[]{"input", "keyevent", "66"}).waitFor();
+            return ToolResult.success("Sent via Enter (LLM parse fail): " + alreadyTypedMessage);
+
+        } catch (Exception e) {
+            XLog.w(TAG, "tapSendViaLlm failed, pressing Enter", e);
+            try {
+                Runtime.getRuntime().exec(new String[]{"input", "keyevent", "66"}).waitFor();
+            } catch (Exception ignored) {}
+            return ToolResult.success("Sent via Enter (LLM exception): " + alreadyTypedMessage);
+        }
+    }
+
+    /**
+     * Full LLM-assisted type and send — when no EditText is found at all.
+     * Asks LLM to identify both input field and send button from the screen.
+     */
+    private ToolResult typeAndSendViaLlm(ClawAccessibilityService service, String message) {
+        try {
+            io.agents.pokeclaw.tool.impl.GetScreenInfoTool screenTool = new io.agents.pokeclaw.tool.impl.GetScreenInfoTool();
+            io.agents.pokeclaw.tool.ToolResult screenResult = screenTool.execute(java.util.Collections.emptyMap());
+            if (!screenResult.isSuccess() || screenResult.getData() == null) {
+                return ToolResult.error("Cannot read screen for LLM-assisted send");
+            }
+
+            String screenText = screenResult.getData();
+            String prompt = "I'm in a messaging chat and need to type and send a message.\n" +
+                "Message to send: \"" + message + "\"\n\n" +
+                "Current screen:\n" + screenText + "\n\n" +
+                "Tell me the steps as JSON array. Example:\n" +
+                "[{\"action\":\"tap\",\"target\":\"n5\"},{\"action\":\"type\",\"text\":\"hello\"},{\"action\":\"tap\",\"target\":\"n8\"}]\n" +
+                "Reply with ONLY the JSON array. Target can be node ID (n5) or coordinates (540,1800).";
+
+            String response = singleLlmCall(prompt);
+            if (response == null || response.isEmpty()) {
+                return ToolResult.error("LLM returned empty response for type+send");
+            }
+
+            // Parse and execute the action sequence
+            return executeLlmActions(service, response, message);
+
+        } catch (Exception e) {
+            XLog.e(TAG, "typeAndSendViaLlm failed", e);
+            return ToolResult.error("LLM-assisted send failed: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Execute a JSON array of actions returned by the LLM.
+     */
+    private ToolResult executeLlmActions(ClawAccessibilityService service, String jsonResponse, String message) {
+        try {
+            // Extract JSON array from response (LLM might add explanation text)
+            String json = jsonResponse.trim();
+            int start = json.indexOf('[');
+            int end = json.lastIndexOf(']');
+            if (start < 0 || end <= start) {
+                return ToolResult.error("Invalid LLM action response: " + json);
+            }
+            json = json.substring(start, end + 1);
+
+            com.google.gson.JsonArray actions = com.google.gson.JsonParser.parseString(json).getAsJsonArray();
+            io.agents.pokeclaw.tool.ToolRegistry registry = io.agents.pokeclaw.tool.ToolRegistry.getInstance();
+
+            for (int i = 0; i < actions.size(); i++) {
+                com.google.gson.JsonObject action = actions.get(i).getAsJsonObject();
+                String actionType = action.get("action").getAsString();
+                Thread.sleep(300);
+
+                switch (actionType) {
+                    case "tap": {
+                        String target = action.get("target").getAsString().trim();
+                        if (target.startsWith("n")) {
+                            java.util.Map<String, Object> params = new java.util.HashMap<>();
+                            params.put("node_id", target);
+                            registry.executeTool("tap_node", params);
+                        } else if (target.contains(",")) {
+                            String[] parts = target.split(",");
+                            service.performTap(Integer.parseInt(parts[0].trim()), Integer.parseInt(parts[1].trim()));
+                        }
+                        break;
+                    }
+                    case "type": {
+                        // Use the actual message, not what LLM echoed (could be truncated)
+                        String text = action.has("text") ? action.get("text").getAsString() : message;
+                        AccessibilityNodeInfo root = service.getRootInActiveWindow();
+                        if (root != null) {
+                            java.util.List<AccessibilityNodeInfo> editables = new java.util.ArrayList<>();
+                            collectEditTexts(root, editables);
+                            if (!editables.isEmpty()) {
+                                AccessibilityNodeInfo field = editables.get(editables.size() - 1);
+                                android.os.Bundle args = new android.os.Bundle();
+                                args.putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, text);
+                                field.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args);
+                            }
+                        }
+                        break;
+                    }
+                }
+            }
+
+            return ToolResult.success("Sent via LLM actions: " + message);
+
+        } catch (Exception e) {
+            XLog.e(TAG, "executeLlmActions failed", e);
+            return ToolResult.error("LLM action execution failed: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Single LLM call — NOT an agent loop. Uses the user's selected Cloud/Local model.
+     * For quick targeted questions like "which node is the send button?"
+     */
+    private String singleLlmCall(String prompt) {
+        try {
+            String provider = io.agents.pokeclaw.utils.KVUtils.INSTANCE.getLlmProvider();
+
+            if (!"LOCAL".equals(provider)) {
+                // Cloud LLM
+                String apiKey = io.agents.pokeclaw.utils.KVUtils.INSTANCE.getLlmApiKey();
+                String baseUrl = io.agents.pokeclaw.utils.KVUtils.INSTANCE.getLlmBaseUrl();
+                String modelName = io.agents.pokeclaw.utils.KVUtils.INSTANCE.getLlmModelName();
+                if (apiKey.isEmpty()) {
+                    apiKey = io.agents.pokeclaw.utils.KVUtils.INSTANCE.getApiKeyForProvider(provider);
+                }
+                if (apiKey.isEmpty()) return null;
+
+                dev.langchain4j.model.chat.ChatModel chatModel = dev.langchain4j.model.openai.OpenAiChatModel.builder()
+                    .httpClientBuilder(new io.agents.pokeclaw.agent.langchain.http.OkHttpClientBuilderAdapter())
+                    .apiKey(apiKey)
+                    .modelName(modelName.isEmpty() ? "gpt-4o-mini" : modelName)
+                    .baseUrl(baseUrl.isEmpty() ? "https://api.openai.com/v1" : baseUrl)
+                    .temperature(0.3)
+                    .build();
+
+                java.util.List<dev.langchain4j.data.message.ChatMessage> messages = new java.util.ArrayList<>();
+                messages.add(dev.langchain4j.data.message.UserMessage.from(prompt));
+
+                dev.langchain4j.model.chat.request.ChatRequest request = dev.langchain4j.model.chat.request.ChatRequest.builder()
+                    .messages(messages)
+                    .build();
+                dev.langchain4j.model.chat.response.ChatResponse response = chatModel.chat(request);
+                return response.aiMessage().text();
+            } else {
+                // Local LLM — use LiteRT-LM for quick inference
+                String modelPath = io.agents.pokeclaw.utils.KVUtils.INSTANCE.getLocalModelPath();
+                if (modelPath == null || modelPath.isEmpty()) return null;
+
+                String cacheDir = io.agents.pokeclaw.ClawApplication.Companion.getInstance().getCacheDir().getPath();
+                com.google.ai.edge.litertlm.Engine engine =
+                    io.agents.pokeclaw.agent.llm.EngineHolder.INSTANCE.getOrCreate(modelPath, cacheDir);
+                com.google.ai.edge.litertlm.Conversation conv = engine.createConversation(
+                    new com.google.ai.edge.litertlm.ConversationConfig(
+                        com.google.ai.edge.litertlm.Contents.Companion.of("You are a UI assistant. Answer concisely."),
+                        java.util.Collections.emptyList(), java.util.Collections.emptyList(),
+                        new com.google.ai.edge.litertlm.SamplerConfig(64, 0.95, 0.3, 0)
+                    )
+                );
+                com.google.ai.edge.litertlm.Message response = conv.sendMessage(prompt, java.util.Collections.emptyMap());
+                conv.close();
+                return response.getContents() != null ? response.getContents().toString().trim() : null;
+            }
+        } catch (Exception e) {
+            XLog.w(TAG, "singleLlmCall failed", e);
+            return null;
+        }
+    }
+
+    /** Find a clickable node whose resource ID contains the keyword */
+    private AccessibilityNodeInfo findClickableByPartialId(AccessibilityNodeInfo node, String keyword) {
+        if (node == null) return null;
+        String rid = node.getViewIdResourceName();
+        if (rid != null && rid.toLowerCase().contains(keyword.toLowerCase()) && node.isClickable()) {
+            return node;
+        }
+        for (int i = 0; i < node.getChildCount(); i++) {
+            AccessibilityNodeInfo child = node.getChild(i);
+            AccessibilityNodeInfo found = findClickableByPartialId(child, keyword);
+            if (found != null) return found;
+        }
+        return null;
     }
 
     /** Collect text nodes in top 300px (toolbar area) */
