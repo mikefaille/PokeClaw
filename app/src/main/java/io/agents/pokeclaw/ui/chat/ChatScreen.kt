@@ -625,6 +625,7 @@ private fun ChatInputBar(
                     skillPanelExpanded = false
                     val example = skill.triggerPatterns.firstOrNull()
                         ?.replace(Regex("\\{\\w+\\}"), "...")
+                    ?.replace(".+", "...")
                         ?: skill.name
                     if (skill.parameters.isEmpty()) {
                         onSendTask(example)
@@ -1272,6 +1273,7 @@ private fun TaskSkillsPanel(
                 val skill = builtInSkills[index]
                 val example = skill.triggerPatterns.firstOrNull()
                     ?.replace(Regex("\\{\\w+\\}"), "...")
+                    ?.replace(".+", "...")
                     ?: skill.name
                 SkillCard(
                     icon = categoryIcons[skill.category] ?: Icons.Outlined.AutoAwesome,
