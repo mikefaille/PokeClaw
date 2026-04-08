@@ -74,9 +74,10 @@ object FloatingCircleManager {
         x: Int? = null,
         y: Int? = null
     ) {
-        android.util.Log.e("POKECLAW_FLOAT", "show() called, isShowing=$isShowing, canDrawOverlays=${android.provider.Settings.canDrawOverlays(application)}")
-        if (isShowing) {
-            android.util.Log.e("POKECLAW_FLOAT", "show() skipped — already showing")
+        XLog.i("FloatingCircle", "show() called, isShowing=$isShowing")
+        if (isShowing || EasyFloat.getFloatView(FLOAT_TAG) != null) {
+            isShowing = true
+            XLog.i("FloatingCircle", "show() skipped — already exists")
             return
         }
         appRef = application
@@ -106,7 +107,7 @@ object FloatingCircleManager {
                     msg: String?,
                     view: View?
                 ) {
-                    android.util.Log.e("POKECLAW_FLOAT", "createdResult: isCreated=$isCreated, msg=$msg, view=${view != null}")
+                    XLog.i("FloatingCircle", "createdResult: isCreated=$isCreated, msg=$msg, view=${view != null}")
                     // Cache the original circle width (must be before any setFloatRootWidth call)
                     view?.findViewById<View>(R.id.floatRoot)?.let { root ->
                         if (circleWidthPx <= 0) {
@@ -282,6 +283,7 @@ object FloatingCircleManager {
     private fun setState(state: State) {
         currentState = state
         val view = EasyFloat.getFloatView(FLOAT_TAG)
+        XLog.i("FloatingCircle", "setState: $state, view=${view != null}, isShowing=$isShowing")
         view?.let { updateStateView(it, state) }
     }
 

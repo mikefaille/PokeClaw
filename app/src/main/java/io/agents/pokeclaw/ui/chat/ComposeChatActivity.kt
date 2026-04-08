@@ -601,9 +601,9 @@ class ComposeChatActivity : ComponentActivity() {
                     XLog.w(TAG, "sendTask: addSystem error", e)
                 }
                 // When task finishes, reload chat engine.
-                val isDone = msg.startsWith("Task completed") || msg.startsWith("Task failed") || msg.startsWith("Blocked") ||
-                    // Also detect LLM chat responses (not status messages) as task completion
-                    (!msg.startsWith("Starting task") && !msg.startsWith("Reading screen") && !msg.startsWith("Step ") && !msg.endsWith("...") && !msg.startsWith("Retrying"))
+                // Only trigger on explicit completion signals — don't guess.
+                val isDone = msg.startsWith("Task completed") || msg.startsWith("Task failed") ||
+                    msg.startsWith("Blocked") || msg.startsWith("Task cancelled")
                 if (isDone) {
                     XLog.i(TAG, "sendTask: task done via progress callback, scheduling chat engine reload")
                     _isProcessing.value = false
