@@ -1291,7 +1291,7 @@ private fun TaskSkillsPanel(
     ) {
         item {
             Text(
-                "Skills",
+                "Tasks",
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Bold,
                 color = colors.textPrimary,
@@ -1321,22 +1321,8 @@ private fun TaskSkillsPanel(
             )
         }
 
-        // Built-in skills from SkillRegistry
+        // Built-in user-facing skills from SkillRegistry
         if (builtInSkills.isNotEmpty()) {
-            item {
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    "Shortcuts",
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = colors.textTertiary,
-                )
-                Text(
-                    "Tap to start",
-                    fontSize = 11.sp,
-                    color = colors.textTertiary.copy(alpha = 0.7f),
-                )
-            }
             items(builtInSkills.size) { index ->
                 val skill = builtInSkills[index]
                 val example = skill.triggerPatterns.firstOrNull()

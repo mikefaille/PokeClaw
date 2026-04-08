@@ -261,7 +261,16 @@ public class AutoReplyManager {
                             List<AccessibilityNodeInfo> matches = new ArrayList<>();
                             findNodesContainingText(root, finalContact.toLowerCase(), matches);
                             if (!matches.isEmpty()) {
-                                svc.clickNode(matches.get(0));
+                                // Prefer nodes matched by getText (chat entry) over contentDescription (profile pic)
+                                AccessibilityNodeInfo best = matches.get(0);
+                                for (AccessibilityNodeInfo m : matches) {
+                                    CharSequence t = m.getText();
+                                    if (t != null && t.toString().toLowerCase().contains(finalContact.toLowerCase())) {
+                                        best = m;
+                                        break;
+                                    }
+                                }
+                                svc.clickNode(best);
                                 XLog.i(TAG, "Tapped contact: " + finalContact);
                                 Thread.sleep(2000);
                             } else {
