@@ -222,8 +222,13 @@ fun ChatScreen(
                         onMonitorClick = { showMonitorSheet = true },
                         onSendClick = { showSendSheet = true },
                         onSkillTap = { example ->
-                            prefillText = example
-                            prefillIsTask = true
+                            if (isLocalModel && !example.contains("...")) {
+                                // No-param skill in local mode → direct execute
+                                onSendTask(example)
+                            } else {
+                                prefillText = example
+                                prefillIsTask = true
+                            }
                         },
                         activatingSkill = activatingSkill,
                         monitorActive = activeTasks.isNotEmpty(),
@@ -665,8 +670,8 @@ private fun ChatInputBar(
             }
         }
 
-        if (taskInputDisabled) {
-            // Local LLM task mode: show status label instead of input
+        if (taskInputDisabled && text.isEmpty()) {
+            // Local LLM task mode with no prefill: show status label
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
