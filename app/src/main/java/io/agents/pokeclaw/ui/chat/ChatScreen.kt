@@ -106,6 +106,7 @@ fun ChatScreen(
     activeTasks: List<String> = emptyList(),
     onStopTask: (String) -> Unit = {},
     onStopAllTasks: () -> Unit = {},
+    onModelSwitch: (modelId: String, displayName: String) -> Unit = { _, _ -> },
     colors: PokeclawColors = AbyssDark,
 ) {
     val drawerState = rememberDrawerState(DrawerValue.Closed)
@@ -176,6 +177,7 @@ fun ChatScreen(
                         onMenuClick = { scope.launch { drawerState.open() } },
                         onNewChat = onNewChat,
                         onSettings = onOpenSettings,
+                        onModelSwitch = onModelSwitch,
                         colors = colors,
                     )
                     if (activeTasks.isNotEmpty()) {
@@ -303,6 +305,7 @@ private fun ChatTopBar(
     onMenuClick: () -> Unit,
     onNewChat: () -> Unit,
     onSettings: () -> Unit,
+    onModelSwitch: (modelId: String, displayName: String) -> Unit = { _, _ -> },
     colors: PokeclawColors,
 ) {
     // Token count color: grey → blue → amber → red
@@ -342,11 +345,14 @@ private fun ChatTopBar(
                 actionIconContentColor = colors.textSecondary,
             ),
         )
-        // Model status + live token counter
+        // Model status + live token counter — tap to switch model
+        var showModelMenu by remember { mutableStateOf(false) }
+        Box {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(colors.surface)
+                .clickable { showModelMenu = true }
                 .padding(horizontal = 16.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -354,6 +360,13 @@ private fun ChatTopBar(
                 text = modelStatus,
                 fontSize = 11.sp,
                 color = colors.textTertiary,
+            )
+            Spacer(Modifier.width(4.dp))
+            Icon(
+                Icons.Default.UnfoldMore,
+                contentDescription = "Switch model",
+                tint = colors.textTertiary,
+                modifier = Modifier.size(12.dp),
             )
             if (sessionTokens > 0) {
                 val formattedTokens = if (sessionTokens >= 1000) {
@@ -371,6 +384,71 @@ private fun ChatTopBar(
                     text = tokenSuffix,
                     fontSize = 11.sp,
                     color = tokenColor,
+                )
+            }
+        }
+            // Model switcher dropdown
+            DropdownMenu(
+                expanded = showModelMenu,
+                onDismissRequest = { showModelMenu = false },
+            ) {
+                // Cloud models (only if API key configured)
+                val hasApiKey = io.agents.pokeclaw.utils.KVUtils.getLlmApiKey().isNotEmpty()
+                if (hasApiKey) {
+                    val currentModel = io.agents.pokeclaw.utils.KVUtils.getLlmModelName()
+                    io.agents.pokeclaw.agent.CloudProvider.entries.forEach { provider ->
+                        provider.models.forEach { model ->
+                            DropdownMenuItem(
+                                text = {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text(
+                                            model.displayName,
+                                            fontSize = 13.sp,
+                                            fontWeight = if (model.id == currentModel) FontWeight.Bold else FontWeight.Normal,
+                                        )
+                                        if (model.id == currentModel) {
+                                            Spacer(Modifier.width(6.dp))
+                                            Text("✓", fontSize = 12.sp, color = colors.accent)
+                                        }
+                                    }
+                                },
+                                onClick = {
+                                    showModelMenu = false
+                                    onModelSwitch(model.id, model.displayName)
+                                },
+                            )
+                        }
+                    }
+                }
+                // Local models
+                val localPath = io.agents.pokeclaw.utils.KVUtils.getLocalModelPath()
+                if (localPath.isNotEmpty()) {
+                    if (hasApiKey) HorizontalDivider()
+                    DropdownMenuItem(
+                        text = {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text("Gemma (On-device)", fontSize = 13.sp,
+                                    fontWeight = if (isLocalModel) FontWeight.Bold else FontWeight.Normal)
+                                if (isLocalModel) {
+                                    Spacer(Modifier.width(6.dp))
+                                    Text("✓", fontSize = 12.sp, color = colors.accent)
+                                }
+                            }
+                        },
+                        onClick = {
+                            showModelMenu = false
+                            onModelSwitch("LOCAL", "Gemma")
+                        },
+                    )
+                }
+                // Settings shortcut
+                HorizontalDivider()
+                DropdownMenuItem(
+                    text = { Text("Configure models...", fontSize = 13.sp, color = colors.textTertiary) },
+                    onClick = {
+                        showModelMenu = false
+                        onSettings()
+                    },
                 )
             }
         }
@@ -1238,13 +1316,13 @@ private fun TaskSkillsPanel(
             item {
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    "Quick Actions",
+                    "Shortcuts",
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Bold,
                     color = colors.textTertiary,
                 )
                 Text(
-                    "Tap to prefill — saves 3-10 AI steps",
+                    "Tap to start",
                     fontSize = 11.sp,
                     color = colors.textTertiary.copy(alpha = 0.7f),
                 )

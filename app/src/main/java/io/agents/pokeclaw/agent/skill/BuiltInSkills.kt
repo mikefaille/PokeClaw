@@ -138,8 +138,7 @@ object BuiltInSkills {
             SkillStep("find_and_tap", mapOf("text" to "Send"), description = "Tap send", optional = true),
             SkillStep("system_key", mapOf("key" to "enter"), description = "Submit message"),
         ),
-        fallbackGoal = "In WhatsApp, find contact '{contact}' and send message: {message}",
-        userFacing = true
+        fallbackGoal = "In WhatsApp, find contact '{contact}' and send message: {message}"
     )
 
     fun navigateToTab() = Skill(
@@ -427,8 +426,7 @@ object BuiltInSkills {
             SkillStep("find_and_tap", mapOf("text" to "Send"), description = "Tap send", optional = true),
             SkillStep("system_key", mapOf("key" to "enter"), description = "Submit message"),
         ),
-        fallbackGoal = "Open Messages and send '{message}' to '{contact}'.",
-        userFacing = true
+        fallbackGoal = "Open Messages and send '{message}' to '{contact}'."
     )
 
     fun takePhoto() = Skill(

@@ -161,6 +161,7 @@ class ComposeChatActivity : ComponentActivity() {
                     autoReplyManager.stopAll()
                     Toast.makeText(this, "All monitoring stopped", Toast.LENGTH_SHORT).show()
                 },
+                onModelSwitch = { modelId, displayName -> switchModel(modelId, displayName) },
                 colors = composeColors,
             )
         }
@@ -637,6 +638,25 @@ class ComposeChatActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    private fun switchModel(modelId: String, displayName: String) {
+        if (modelId == "LOCAL") {
+            KVUtils.setLlmProvider("LOCAL")
+            _modelStatus.value = "● Gemma · On-device"
+            addSystem("Switched to local model")
+            loadModelIfReady()
+        } else {
+            val provider = io.agents.pokeclaw.agent.CloudProvider.findProviderForModel(modelId)
+            KVUtils.setLlmProvider("OPENAI")
+            KVUtils.setLlmModelName(modelId)
+            if (provider != null) {
+                KVUtils.setLlmBaseUrl(provider.defaultBaseUrl)
+            }
+            loadModelIfReady()
+            addSystem("Switched to $displayName")
+        }
+        XLog.i(TAG, "Model switched to: $modelId ($displayName)")
     }
 
     private fun newChat() {
