@@ -177,9 +177,10 @@ fun ChatScreen(
                         onModelSwitch = onModelSwitch,
                         colors = colors,
                     )
-                    if (activeTasks.isNotEmpty()) {
+                    if (activeTasks.isNotEmpty() || isProcessing) {
                         ActiveTaskBar(
                             tasks = activeTasks,
+                            isRunningTask = isProcessing,
                             onStopTask = onStopTask,
                             onStopAll = onStopAllTasks,
                             colors = colors,
@@ -196,6 +197,7 @@ fun ChatScreen(
                         onTaskModeChange = { isTaskMode = it },
                         onSendChat = onSendChat,
                         onSendTask = onSendTask,
+                        onStopAll = onStopAllTasks,
                         onAttach = onAttach,
                         colors = colors,
                         prefillText = prefillText,
@@ -683,6 +685,7 @@ private fun ChatInputBar(
     onTaskModeChange: (Boolean) -> Unit,
     onSendChat: (String) -> Unit,
     onSendTask: (String) -> Unit,
+    onStopAll: () -> Unit = {},
     onAttach: () -> Unit,
     colors: PokeclawColors,
     prefillText: String = "",
@@ -796,15 +799,15 @@ private fun ChatInputBar(
 
                 FloatingActionButton(
                     onClick = {
-                        if (text.isNotBlank()) {
+                        if (isProcessing) {
+                            // Task running → stop it
+                            onStopAll()
+                        } else if (text.isNotBlank()) {
                             if (!isLocalModel || isTaskMode) {
-                                // Cloud LLM any tab / Local LLM Task tab: sendTask
-                                // Cloud LLM relies on system prompt to distinguish chat vs task
                                 onSendTask(text.trim())
                                 text = ""
                                 focusManager.clearFocus()
                             } else if (!isProcessing) {
-                                // Local LLM Chat tab: pure chat
                                 onSendChat(text.trim())
                                 text = ""
                                 focusManager.clearFocus()
@@ -812,13 +815,15 @@ private fun ChatInputBar(
                         }
                     },
                     modifier = Modifier.size(36.dp),
-                    containerColor = if (text.isBlank()) colors.accent.copy(alpha = 0.2f) else colors.accent,
+                    containerColor = if (isProcessing) androidx.compose.ui.graphics.Color(0xFFF44336)
+                        else if (text.isBlank()) colors.accent.copy(alpha = 0.2f) else colors.accent,
                     shape = CircleShape,
                     elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 0.dp),
                 ) {
                     Icon(
-                        if (isTaskMode) Icons.Outlined.TouchApp else Icons.Default.ArrowUpward,
-                        contentDescription = "Send",
+                        if (isProcessing) Icons.Default.Close
+                        else if (isTaskMode) Icons.Outlined.TouchApp else Icons.Default.ArrowUpward,
+                        contentDescription = if (isProcessing) "Stop" else "Send",
                         tint = Color.White,
                         modifier = Modifier.size(18.dp),
                     )
@@ -1727,6 +1732,7 @@ private fun SendMessageDialog(
 @Composable
 private fun ActiveTaskBar(
     tasks: List<String>,
+    isRunningTask: Boolean = false,
     onStopTask: (String) -> Unit,
     onStopAll: () -> Unit,
     colors: PokeclawColors,
@@ -1738,36 +1744,74 @@ private fun ActiveTaskBar(
             .fillMaxWidth()
             .background(colors.surface)
     ) {
-        // Collapsed bar
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable { expanded = !expanded }
-                .padding(horizontal = 16.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Box(
+        // Running task bar (agent task in progress)
+        if (isRunningTask) {
+            Row(
                 modifier = Modifier
-                    .size(8.dp)
-                    .background(
-                        color = androidx.compose.ui.graphics.Color(0xFF4CAF50),
-                        shape = androidx.compose.foundation.shape.CircleShape,
-                    )
-            )
-            Spacer(Modifier.width(10.dp))
-            Text(
-                text = if (tasks.size == 1) "Monitoring: ${tasks[0]}" else "${tasks.size} tasks running",
-                color = colors.textPrimary,
-                fontSize = 14.sp,
-                maxLines = 1,
-                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f),
-            )
-            Text(
-                text = if (expanded) "▴" else "▾",
-                color = colors.textSecondary,
-                fontSize = 14.sp,
-            )
+                    .fillMaxWidth()
+                    .background(androidx.compose.ui.graphics.Color(0xFF332200))
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(8.dp)
+                        .background(
+                            color = androidx.compose.ui.graphics.Color(0xFFFF9800),
+                            shape = androidx.compose.foundation.shape.CircleShape,
+                        )
+                )
+                Spacer(Modifier.width(10.dp))
+                Text(
+                    text = "Task running...",
+                    color = androidx.compose.ui.graphics.Color(0xFFFF9800),
+                    fontSize = 13.sp,
+                    modifier = Modifier.weight(1f),
+                )
+                Text(
+                    text = "Stop",
+                    color = androidx.compose.ui.graphics.Color(0xFFF44336),
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier
+                        .clickable { onStopAll() }
+                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                )
+            }
+        }
+
+        // Monitor tasks bar
+        if (tasks.isNotEmpty()) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { expanded = !expanded }
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(8.dp)
+                        .background(
+                            color = androidx.compose.ui.graphics.Color(0xFF4CAF50),
+                            shape = androidx.compose.foundation.shape.CircleShape,
+                        )
+                )
+                Spacer(Modifier.width(10.dp))
+                Text(
+                    text = if (tasks.size == 1) "Monitoring: ${tasks[0]}" else "${tasks.size} monitoring",
+                    color = colors.textPrimary,
+                    fontSize = 13.sp,
+                    maxLines = 1,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+                Text(
+                    text = if (expanded) "▴" else "▾",
+                    color = colors.textSecondary,
+                    fontSize = 14.sp,
+                )
+            }
         }
 
         // Expanded — show each task with stop button

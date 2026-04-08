@@ -267,10 +267,12 @@ class TaskOrchestrator(
                 }
             }
 
+            var floatingShown = false
             override fun onToolCall(round: Int, toolId: String, toolName: String, parameters: String) {
                 XLog.d(TAG, "onToolCall: $toolId($toolName), $parameters")
-                // First tool call = this is a real task, show floating circle
-                if (round == 1) {
+                // Show floating circle on first tool call (confirms this is a real task)
+                if (!floatingShown) {
+                    floatingShown = true
                     FloatingCircleManager.showTaskNotify(task, channel)
                     ForegroundService.updateTaskStatus(ClawApplication.instance, "Running task...")
                 }
