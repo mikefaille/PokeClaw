@@ -121,9 +121,11 @@ object BuiltInSkills {
             SkillParameter("message", "string", true, "Message to send")
         ),
         triggerPatterns = listOf(
-            "send .+ on whatsapp",
-            "whatsapp .+ to .+",
-            "message .+ on whatsapp"
+            "send {message} to {contact} on whatsapp",
+            "send {message} to {contact} via whatsapp",
+            "whatsapp {contact} saying {message}",
+            "whatsapp {contact} {message}",
+            "message {contact} on whatsapp {message}"
         ),
         steps = listOf(
             SkillStep("open_app", mapOf("app_name" to "WhatsApp"), description = "Open WhatsApp"),
