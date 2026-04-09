@@ -192,20 +192,35 @@ fun ChatScreen(
             },
             bottomBar = {
                 if (!isDownloading) {
-                    ChatInputBar(
-                        isProcessing = isProcessing,
-                        isTaskMode = isTaskMode,
-                        isLocalModel = isLocalModel,
-                        onTaskModeChange = { isTaskMode = it },
-                        onSendChat = onSendChat,
-                        onSendTask = onSendTask,
-                        onStopAll = onStopAllTasks,
-                        onAttach = onAttach,
-                        colors = colors,
-                        prefillText = prefillText,
-                        prefillIsTask = prefillIsTask,
-                        onPrefillConsumed = { prefillText = "" },
-                    )
+                    Column {
+                        // Quick Tasks collapsible panel (v9 style)
+                        QuickTasksPanel(
+                            isLocalModel = isLocalModel,
+                            onFillTask = { text ->
+                                prefillText = text
+                                prefillIsTask = true
+                                if (isLocalModel) isTaskMode = true
+                            },
+                            onMonitorClick = { showMonitorSheet = true },
+                            monitorActive = activeTasks.isNotEmpty(),
+                            colors = colors,
+                        )
+
+                        ChatInputBar(
+                            isProcessing = isProcessing,
+                            isTaskMode = isTaskMode,
+                            isLocalModel = isLocalModel,
+                            onTaskModeChange = { isTaskMode = it },
+                            onSendChat = onSendChat,
+                            onSendTask = onSendTask,
+                            onStopAll = onStopAllTasks,
+                            onAttach = onAttach,
+                            colors = colors,
+                            prefillText = prefillText,
+                            prefillIsTask = prefillIsTask,
+                            onPrefillConsumed = { prefillText = "" },
+                        )
+                    }
                 }
             }
         ) { padding ->
@@ -350,8 +365,59 @@ private fun ChatTopBar(
                 actionIconContentColor = colors.textSecondary,
             ),
         )
-        // Model status + live token counter — tap to switch model
+        // Local/Cloud tab + Model dropdown
         var showModelMenu by remember { mutableStateOf(false) }
+        // Tab state tracks which panel is shown — syncs with isLocalModel on init
+        var selectedTab by remember { mutableStateOf(if (isLocalModel) "local" else "cloud") }
+        // Sync tab when model changes externally
+        LaunchedEffect(isLocalModel) { selectedTab = if (isLocalModel) "local" else "cloud" }
+
+        // Local / Cloud tabs
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(colors.surface)
+                .padding(horizontal = 12.dp, vertical = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            // Local tab
+            Surface(
+                onClick = { selectedTab = "local" },
+                shape = RoundedCornerShape(10.dp),
+                color = if (selectedTab == "local") colors.aiBubble else Color.Transparent,
+                border = if (selectedTab == "local") androidx.compose.foundation.BorderStroke(1.dp, colors.aiBubbleBorder) else null,
+                modifier = Modifier.weight(1f),
+            ) {
+                Text(
+                    "💬 Local AI",
+                    fontSize = 12.sp,
+                    fontWeight = if (selectedTab == "local") FontWeight.SemiBold else FontWeight.Normal,
+                    color = if (selectedTab == "local") colors.textPrimary else colors.textTertiary,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(vertical = 8.dp),
+                )
+            }
+            // Cloud tab
+            val taskAccent = Color(0xFFE8751A)
+            Surface(
+                onClick = { selectedTab = "cloud" },
+                shape = RoundedCornerShape(10.dp),
+                color = if (selectedTab == "cloud") taskAccent.copy(alpha = 0.15f) else Color.Transparent,
+                border = if (selectedTab == "cloud") androidx.compose.foundation.BorderStroke(1.dp, taskAccent.copy(alpha = 0.4f)) else null,
+                modifier = Modifier.weight(1f),
+            ) {
+                Text(
+                    "🤖 Cloud AI",
+                    fontSize = 12.sp,
+                    fontWeight = if (selectedTab == "cloud") FontWeight.SemiBold else FontWeight.Normal,
+                    color = if (selectedTab == "cloud") taskAccent else colors.textTertiary,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(vertical = 8.dp),
+                )
+            }
+        }
+
+        // Model status + dropdown — filtered by selected tab
         Box {
         Row(
             modifier = Modifier
@@ -402,23 +468,59 @@ private fun ChatTopBar(
                 val baseUrl = kvUtils.getLlmBaseUrl()
                 val currentModel = kvUtils.getLlmModelName()
 
-                // Cloud models: only from the configured provider
-                if (apiKey.isNotEmpty()) {
-                    val activeProvider = io.agents.pokeclaw.agent.CloudProvider.entries.find {
-                        it.defaultBaseUrl == baseUrl
+                if (selectedTab == "cloud") {
+                    // Cloud models: from configured provider
+                    if (apiKey.isNotEmpty()) {
+                        val activeProvider = io.agents.pokeclaw.agent.CloudProvider.entries.find {
+                            it.defaultBaseUrl == baseUrl
+                        }
+                        val modelsToShow = activeProvider?.models
+                            ?: io.agents.pokeclaw.agent.CloudProvider.OPENAI.models
+                        modelsToShow.forEach { model ->
+                            DropdownMenuItem(
+                                text = {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text(
+                                            model.displayName,
+                                            fontSize = 13.sp,
+                                            fontWeight = if (model.id == currentModel && !isLocalModel) FontWeight.Bold else FontWeight.Normal,
+                                        )
+                                        if (model.id == currentModel && !isLocalModel) {
+                                            Spacer(Modifier.width(6.dp))
+                                            Text("✓", fontSize = 12.sp, color = colors.accent)
+                                        }
+                                    }
+                                },
+                                onClick = {
+                                    showModelMenu = false
+                                    onModelSwitch(model.id, model.displayName)
+                                },
+                            )
+                        }
+                    } else {
+                        // No API key configured
+                        DropdownMenuItem(
+                            text = { Text("No API key configured", fontSize = 13.sp, color = colors.textTertiary) },
+                            onClick = { showModelMenu = false; onSettings() },
+                        )
                     }
-                    val modelsToShow = activeProvider?.models
-                        ?: io.agents.pokeclaw.agent.CloudProvider.OPENAI.models
-                    modelsToShow.forEach { model ->
+                    HorizontalDivider()
+                    DropdownMenuItem(
+                        text = { Text("Configure API key...", fontSize = 13.sp, color = colors.accent) },
+                        onClick = { showModelMenu = false; onSettings() },
+                    )
+                } else {
+                    // Local models: downloaded models
+                    val localPath = kvUtils.getLocalModelPath()
+                    if (localPath.isNotEmpty() && java.io.File(localPath).exists()) {
+                        val localName = java.io.File(localPath).nameWithoutExtension
+                            .replace("-", " ").replace("_", " ")
                         DropdownMenuItem(
                             text = {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text(
-                                        model.displayName,
-                                        fontSize = 13.sp,
-                                        fontWeight = if (model.id == currentModel && !isLocalModel) FontWeight.Bold else FontWeight.Normal,
-                                    )
-                                    if (model.id == currentModel && !isLocalModel) {
+                                    Text("$localName (On-device)", fontSize = 13.sp,
+                                        fontWeight = if (isLocalModel) FontWeight.Bold else FontWeight.Normal)
+                                    if (isLocalModel) {
                                         Spacer(Modifier.width(6.dp))
                                         Text("✓", fontSize = 12.sp, color = colors.accent)
                                     }
@@ -426,45 +528,21 @@ private fun ChatTopBar(
                             },
                             onClick = {
                                 showModelMenu = false
-                                onModelSwitch(model.id, model.displayName)
+                                onModelSwitch("LOCAL", localName)
                             },
                         )
+                    } else {
+                        DropdownMenuItem(
+                            text = { Text("No local model downloaded", fontSize = 13.sp, color = colors.textTertiary) },
+                            onClick = { showModelMenu = false; onSettings() },
+                        )
                     }
-                }
-
-                // Local model: only if file actually downloaded
-                val localPath = kvUtils.getLocalModelPath()
-                if (localPath.isNotEmpty() && java.io.File(localPath).exists()) {
-                    if (apiKey.isNotEmpty()) HorizontalDivider()
-                    val localName = java.io.File(localPath).nameWithoutExtension
-                        .replace("-", " ").replace("_", " ")
+                    HorizontalDivider()
                     DropdownMenuItem(
-                        text = {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text("$localName (On-device)", fontSize = 13.sp,
-                                    fontWeight = if (isLocalModel) FontWeight.Bold else FontWeight.Normal)
-                                if (isLocalModel) {
-                                    Spacer(Modifier.width(6.dp))
-                                    Text("✓", fontSize = 12.sp, color = colors.accent)
-                                }
-                            }
-                        },
-                        onClick = {
-                            showModelMenu = false
-                            onModelSwitch("LOCAL", localName)
-                        },
+                        text = { Text("Download models...", fontSize = 13.sp, color = colors.accent) },
+                        onClick = { showModelMenu = false; onSettings() },
                     )
                 }
-
-                // Settings shortcut
-                HorizontalDivider()
-                DropdownMenuItem(
-                    text = { Text("Configure models...", fontSize = 13.sp, color = colors.textTertiary) },
-                    onClick = {
-                        showModelMenu = false
-                        onSettings()
-                    },
-                )
             }
         }
         HorizontalDivider(color = colors.divider, thickness = 0.5.dp)
@@ -696,140 +774,146 @@ private fun ChatInputBar(
 ) {
     var text by remember { mutableStateOf("") }
     val focusManager = LocalFocusManager.current
-    // Task tab: Cloud LLM can type custom task instructions; Local LLM uses workflow cards only
-    val taskInputDisabled = isTaskMode && isLocalModel
-
     // Consume prefill from prompt chips
     LaunchedEffect(prefillText) {
         if (prefillText.isNotEmpty()) {
             text = prefillText
-            // Only switch to Task tab for Local LLM; Cloud stays in Chat
             if (isLocalModel) onTaskModeChange(prefillIsTask)
             onPrefillConsumed()
         }
     }
 
-    // Skill shortcut panel removed — skills only show in Task mode
+    val taskAccent = Color(0xFFE8751A)
+    val taskBg = Color(0xFF1A1410)
+    val taskBorder = taskAccent.copy(alpha = 0.25f)
 
-    Column(modifier = Modifier.background(colors.surface)) {
-        HorizontalDivider(color = colors.divider, thickness = 0.5.dp)
+    Column(
+        modifier = Modifier.background(
+            if (isTaskMode && isLocalModel) taskBg else colors.surface
+        )
+    ) {
+        HorizontalDivider(
+            color = if (isTaskMode && isLocalModel) taskBorder else colors.divider,
+            thickness = 0.5.dp,
+        )
 
-        // Skill shortcut panel removed — Chat is pure chat, skills in Task mode only
+        // Segmented Chat/Task toggle — Local LLM only
+        if (isLocalModel) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 10.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                // Chat button
+                Surface(
+                    onClick = { onTaskModeChange(false) },
+                    shape = RoundedCornerShape(10.dp),
+                    color = if (!isTaskMode) colors.aiBubble else Color.Transparent,
+                    border = if (!isTaskMode) androidx.compose.foundation.BorderStroke(1.dp, colors.aiBubbleBorder) else null,
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Text(
+                        "💬 Chat",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = if (!isTaskMode) colors.textPrimary else colors.textTertiary,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(vertical = 9.dp),
+                    )
+                }
+                // Task button
+                Surface(
+                    onClick = { onTaskModeChange(true) },
+                    shape = RoundedCornerShape(10.dp),
+                    color = if (isTaskMode) taskAccent else Color.Transparent,
+                    border = if (isTaskMode) androidx.compose.foundation.BorderStroke(1.dp, taskAccent) else null,
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Text(
+                        "🤖 Task",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = if (isTaskMode) Color.White else colors.textTertiary,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(vertical = 9.dp),
+                    )
+                }
+            }
+        }
 
-        // Mode toggle tabs — always visible (Cloud has both chat+task, Local needs tab to switch)
+        // Input bar — always visible, style changes in Task mode
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 4.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                .padding(start = 8.dp, end = 8.dp, bottom = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            ModeTab(
-                label = "Chat",
-                icon = Icons.Outlined.ChatBubbleOutline,
-                selected = !isTaskMode,
-                onClick = { onTaskModeChange(false) },
-                colors = colors,
-                modifier = Modifier.weight(1f),
-            )
-            ModeTab(
-                label = "Task",
-                icon = Icons.Outlined.TouchApp,
-                selected = isTaskMode,
-                onClick = { onTaskModeChange(true) },
-                colors = colors,
-                modifier = Modifier.weight(1f),
-            )
-        }
-
-        if (taskInputDisabled && text.isEmpty()) {
-            // Local LLM task mode with no prefill: show status label
-            Row(
+            OutlinedTextField(
+                value = text,
+                onValueChange = { text = it },
+                placeholder = {
+                    Text(
+                        when {
+                            isLocalModel && isTaskMode -> "Describe a phone task..."
+                            !isLocalModel -> "Chat or give a task..."
+                            else -> "Chat with local AI..."
+                        },
+                        color = if (isTaskMode && isLocalModel) taskAccent.copy(alpha = 0.5f) else colors.textTertiary,
+                        fontSize = 14.sp,
+                    )
+                },
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 10.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.Center,
+                    .weight(1f)
+                    .heightIn(min = 40.dp, max = 100.dp),
+                shape = RoundedCornerShape(20.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = if (isTaskMode && isLocalModel) taskAccent else colors.accent.copy(alpha = 0.4f),
+                    unfocusedBorderColor = if (isTaskMode && isLocalModel) taskAccent.copy(alpha = 0.6f) else colors.inputBorder,
+                    cursorColor = if (isTaskMode && isLocalModel) taskAccent else colors.accent,
+                    focusedTextColor = colors.textPrimary,
+                    unfocusedTextColor = colors.textPrimary,
+                    focusedContainerColor = if (isTaskMode && isLocalModel) taskBg else Color.Transparent,
+                    unfocusedContainerColor = if (isTaskMode && isLocalModel) taskBg else Color.Transparent,
+                ),
+                textStyle = androidx.compose.ui.text.TextStyle(fontSize = 14.sp),
+                maxLines = 4,
+            )
+
+            Spacer(Modifier.width(4.dp))
+
+            FloatingActionButton(
+                onClick = {
+                    if (isProcessing) {
+                        onStopAll()
+                    } else if (text.isNotBlank()) {
+                        if (!isLocalModel || isTaskMode) {
+                            onSendTask(text.trim())
+                            text = ""
+                            focusManager.clearFocus()
+                        } else {
+                            onSendChat(text.trim())
+                            text = ""
+                            focusManager.clearFocus()
+                        }
+                    }
+                },
+                modifier = Modifier.size(36.dp),
+                containerColor = when {
+                    isProcessing -> Color(0xFFF44336)
+                    text.isBlank() -> colors.background.copy(alpha = 0.5f)
+                    isTaskMode && isLocalModel -> taskAccent
+                    else -> colors.accent
+                },
+                shape = CircleShape,
+                elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 0.dp),
             ) {
                 Icon(
-                    Icons.Outlined.TouchApp,
-                    contentDescription = null,
-                    tint = colors.textTertiary,
-                    modifier = Modifier.size(14.dp),
+                    if (isProcessing) Icons.Default.Close else Icons.Default.ArrowUpward,
+                    contentDescription = if (isProcessing) "Stop" else "Send",
+                    tint = Color.White,
+                    modifier = Modifier.size(18.dp),
                 )
-                Spacer(Modifier.width(6.dp))
-                Text(
-                    "Tap a skill above to start",
-                    fontSize = 12.sp,
-                    color = colors.textTertiary,
-                )
-            }
-        } else {
-            // Normal input bar (Cloud LLM any mode, or Local LLM chat mode)
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(start = 8.dp, end = 8.dp, bottom = 6.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                OutlinedTextField(
-                    value = text,
-                    onValueChange = { text = it },
-                    placeholder = {
-                        Text(
-                            if (isTaskMode) "Tell me what to do..."
-                            else "Ask anything...",
-                            color = colors.textTertiary,
-                            fontSize = 14.sp,
-                        )
-                    },
-                    modifier = Modifier
-                        .weight(1f)
-                        .heightIn(min = 40.dp, max = 100.dp),
-                    shape = RoundedCornerShape(20.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = colors.accent.copy(alpha = 0.4f),
-                        unfocusedBorderColor = colors.inputBorder,
-                        cursorColor = colors.accent,
-                        focusedTextColor = colors.textPrimary,
-                        unfocusedTextColor = colors.textPrimary,
-                    ),
-                    textStyle = androidx.compose.ui.text.TextStyle(fontSize = 14.sp),
-                    maxLines = 4,
-                )
-
-                Spacer(Modifier.width(4.dp))
-
-                FloatingActionButton(
-                    onClick = {
-                        if (isProcessing) {
-                            // Task running → stop it
-                            onStopAll()
-                        } else if (text.isNotBlank()) {
-                            if (!isLocalModel || isTaskMode) {
-                                onSendTask(text.trim())
-                                text = ""
-                                focusManager.clearFocus()
-                            } else if (!isProcessing) {
-                                onSendChat(text.trim())
-                                text = ""
-                                focusManager.clearFocus()
-                            }
-                        }
-                    },
-                    modifier = Modifier.size(36.dp),
-                    containerColor = if (isProcessing) androidx.compose.ui.graphics.Color(0xFFF44336)
-                        else if (text.isBlank()) colors.accent.copy(alpha = 0.2f) else colors.accent,
-                    shape = CircleShape,
-                    elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 0.dp),
-                ) {
-                    Icon(
-                        if (isProcessing) Icons.Default.Close
-                        else if (isTaskMode) Icons.Outlined.TouchApp else Icons.Default.ArrowUpward,
-                        contentDescription = if (isProcessing) "Stop" else "Send",
-                        tint = Color.White,
-                        modifier = Modifier.size(18.dp),
-                    )
-                }
             }
         }
     }
@@ -1052,27 +1136,23 @@ private fun EmptyStateWithPrompts(
     val prompts = if (!isLocalModel) {
         listOf(
             Prompt("What time is it in Tokyo?", false),
-            Prompt("Open WhatsApp and say hi to Mom", true),
-            Prompt("Open YouTube and play cat videos", true),
+            Prompt("Help me write a birthday message", false),
+            Prompt("💬 Send hi to Mom on WhatsApp", true),
         )
     } else {
         listOf(
+            Prompt("Tell me a joke", false),
             Prompt("What can you do?", false),
             Prompt("Help me draft an email", false),
-            Prompt("Tell me a joke", false),
         )
     }
 
-    val headerText = if (!isLocalModel) {
-        "Cloud LLM enabled"
-    } else {
-        "Local LLM enabled"
-    }
+    val headerText = if (!isLocalModel) "Cloud AI" else "Local AI"
 
     val subtitleText = if (!isLocalModel) {
-        "You can chat or give phone tasks directly here. For background tasks like auto-reply, go to the Task tab."
+        "Chat and tasks work together — just type anything"
     } else {
-        "Chat here. To control your phone, switch to the Task tab and pick a workflow."
+        "Chat in 💬 Chat mode, or switch to 🤖 Task to control your phone"
     }
 
     Column(
@@ -1144,6 +1224,178 @@ private fun EmptyStateWithPrompts(
                         )
                     }
                 }
+            }
+        }
+    }
+}
+
+// ======================== QUICK TASKS PANEL (v9) ========================
+
+@Composable
+private fun QuickTasksPanel(
+    isLocalModel: Boolean,
+    onFillTask: (String) -> Unit,
+    onMonitorClick: () -> Unit,
+    monitorActive: Boolean,
+    colors: PokeclawColors,
+) {
+    val taskAccent = Color(0xFFE8751A)
+    var expanded by remember { mutableStateOf(true) }
+    var showAll by remember { mutableStateOf(false) }
+
+    val quickTasks = listOf(
+        "🔋 How much battery left?",
+        "📶 What WiFi am I on?",
+        "🔔 Read my notifications",
+        "📞 Call someone",
+        "💬 Send hi to Mom on WhatsApp",
+        "💾 How much storage do I have?",
+        "🌙 Turn on dark mode",
+        "📱 What apps do I have?",
+        "🌡️ How hot is my phone?",
+        "🔵 Is bluetooth on?",
+        "📲 What Android version am I running?",
+        "📸 Take a screenshot",
+    )
+
+    Column(
+        modifier = Modifier.background(colors.surface),
+    ) {
+        HorizontalDivider(color = colors.divider, thickness = 0.5.dp)
+
+        // Handle bar — ▲ Quick Tasks ▲
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { expanded = !expanded }
+                .padding(vertical = 8.dp),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                if (expanded) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowUp,
+                contentDescription = "Toggle",
+                tint = colors.accent,
+                modifier = Modifier.size(14.dp),
+            )
+            Spacer(Modifier.width(6.dp))
+            Text(
+                "Quick Tasks",
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Medium,
+                color = colors.accent,
+            )
+            Spacer(Modifier.width(6.dp))
+            Icon(
+                if (expanded) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowUp,
+                contentDescription = "Toggle",
+                tint = colors.accent,
+                modifier = Modifier.size(14.dp),
+            )
+        }
+
+        // Collapsible content
+        if (expanded) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(3.dp),
+            ) {
+                val visibleTasks = if (showAll) quickTasks else quickTasks.take(5)
+                visibleTasks.forEach { task ->
+                    Surface(
+                        onClick = { onFillTask(task.substringAfter(" ")) },
+                        shape = RoundedCornerShape(9.dp),
+                        color = colors.background,
+                        border = androidx.compose.foundation.BorderStroke(0.5.dp, colors.inputBorder),
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .width(3.dp)
+                                    .height(30.dp)
+                                    .background(taskAccent, RoundedCornerShape(topStart = 9.dp, bottomStart = 9.dp)),
+                            )
+                            Text(
+                                task,
+                                fontSize = 11.sp,
+                                color = colors.textSecondary,
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
+                            )
+                        }
+                    }
+                }
+
+                // Show more / Show less
+                Text(
+                    if (showAll) "Show less" else "Show more",
+                    fontSize = 10.sp,
+                    color = colors.accent,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { showAll = !showAll }
+                        .padding(vertical = 5.dp),
+                )
+
+                // Background section
+                Text(
+                    "BACKGROUND",
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = colors.textTertiary,
+                    letterSpacing = 0.5.sp,
+                    modifier = Modifier.padding(top = 4.dp, bottom = 4.dp),
+                )
+
+                // Monitor card
+                val monitorBorderColor = if (monitorActive) taskAccent else colors.inputBorder
+                Surface(
+                    onClick = onMonitorClick,
+                    shape = RoundedCornerShape(10.dp),
+                    color = colors.background,
+                    border = androidx.compose.foundation.BorderStroke(
+                        if (monitorActive) 1.dp else 0.5.dp,
+                        monitorBorderColor,
+                    ),
+                ) {
+                    Row(
+                        modifier = Modifier.padding(10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(34.dp)
+                                .background(
+                                    taskAccent.copy(alpha = 0.12f),
+                                    RoundedCornerShape(9.dp),
+                                ),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text("👁️", fontSize = 15.sp)
+                        }
+                        Spacer(Modifier.width(8.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                if (monitorActive) "Active" else "Monitor & Auto-Reply",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = colors.textPrimary,
+                            )
+                            Text(
+                                if (monitorActive) "Monitoring active" else "Watch messages and reply automatically",
+                                fontSize = 9.sp,
+                                color = colors.textTertiary,
+                            )
+                        }
+                        Text("›", color = colors.textTertiary, fontSize = 14.sp)
+                    }
+                }
+                Spacer(Modifier.height(6.dp))
             }
         }
     }
