@@ -1,6 +1,143 @@
 # PokeClaw E2E QA Checklist
 
-Every build must pass ALL checks before shipping. Run on Pixel 8 Pro (or equivalent).
+Every build must pass ALL checks before shipping.
+
+---
+
+## QA Methodology — How to Test (READ THIS FIRST)
+
+### Device Setup
+
+```bash
+# 1. Check device connected
+adb devices -l
+
+# 2. Install APK
+cd /home/nicole/MyGithub/PokeClaw
+./gradlew assembleDebug
+APK=$(find app/build/outputs/apk/debug/ -name "*.apk" | head -1)
+adb install -r "$APK"
+
+# 3. Launch app
+adb shell am start -n io.agents.pokeclaw/io.agents.pokeclaw.ui.splash.SplashActivity
+sleep 5
+
+# 4. Enable accessibility (if not already)
+CURRENT=$(adb shell settings get secure enabled_accessibility_services)
+[[ "$CURRENT" != *"io.agents.pokeclaw"* ]] && \
+  adb shell settings put secure enabled_accessibility_services \
+  "$CURRENT:io.agents.pokeclaw/io.agents.pokeclaw.service.ClawAccessibilityService"
+
+# 5. Grant permissions
+adb shell pm grant io.agents.pokeclaw android.permission.READ_CONTACTS
+```
+
+### Configure LLM via ADB
+
+```bash
+# Cloud LLM
+source /home/nicole/MyGithub/PokeClaw/.env
+adb shell "am broadcast -a io.agents.pokeclaw.DEBUG_TASK -p io.agents.pokeclaw \
+  --es task 'config:' --es api_key '$OPENAI_API_KEY' --es model_name 'gpt-4.1'"
+
+# Local LLM
+MODEL_PATH="/storage/emulated/0/Android/data/io.agents.pokeclaw/files/models/gemma-4-E2B-it.litertlm"
+adb shell "am broadcast -a io.agents.pokeclaw.DEBUG_TASK -p io.agents.pokeclaw \
+  --es task 'config:' --es provider 'LOCAL' --es base_url '$MODEL_PATH' --es model_name 'gemma4-e2b'"
+```
+
+### Send a Task via ADB (for M tests)
+
+```bash
+# IMPORTANT: wrap the task string in single quotes INSIDE adb shell double quotes
+adb logcat -c
+adb shell "am broadcast -a io.agents.pokeclaw.DEBUG_TASK -p io.agents.pokeclaw \
+  --es task 'how much battery left'"
+```
+
+### Read Results from Logcat
+
+```bash
+# Wait for task to complete (Cloud ~10s, Local ~60-120s per round)
+sleep 15
+PID=$(adb shell pidof io.agents.pokeclaw)
+
+# Check which tools were called + final answer
+adb logcat -d | grep "$PID" | grep -E "onToolCall|onComplete" | head -10
+
+# Full breakdown
+adb logcat -d | grep "$PID" | grep -E "DebugTask|PipelineRouter|AgentService|TaskOrchestrator|onToolCall|onComplete"
+```
+
+### Verify PASS/FAIL
+
+For each M test, check:
+1. **Correct tool called** — e.g., "how much battery" should call `get_device_info(battery)`, NOT open Settings
+2. **Actual data in answer** — "73%, not charging, 32°C" NOT "I checked the battery"
+3. **Rounds** — system queries should be 2 rounds, complex tasks 5-15
+4. **Auto-return** — after task, PokeClaw chatroom should come back to foreground
+5. **Graceful failure** — if task can't complete, clear error message (not stuck/loop)
+
+### Verify UI via Uiautomator
+
+```bash
+# Dump all visible UI elements
+adb shell uiautomator dump /sdcard/ui.xml
+adb shell cat /sdcard/ui.xml | python3 -c "
+import sys, xml.etree.ElementTree as ET
+root = ET.fromstring(sys.stdin.read())
+for node in root.iter():
+    text = node.get('text', '')
+    desc = node.get('content-desc', '')
+    pkg = node.get('package', '')
+    if (text or desc) and 'pokeclaw' in pkg.lower():
+        print(f'text={text!r} desc={desc!r}')
+"
+```
+
+Use this to verify:
+- UI elements are present (tabs, buttons, prompts)
+- Placeholder text changes when switching modes
+- Correct model name shows in dropdown
+
+### Tap UI Elements
+
+```bash
+# Find coordinates of an element
+adb shell cat /sdcard/ui.xml | python3 -c "
+import sys, xml.etree.ElementTree as ET
+root = ET.fromstring(sys.stdin.read())
+for node in root.iter():
+    text = node.get('text', '')
+    bounds = node.get('bounds', '')
+    if 'Task' in text:
+        print(f'text={text!r} bounds={bounds}')
+"
+
+# Tap at coordinates (center of bounds)
+adb shell input tap 746 2041
+```
+
+### Cross-Device Testing
+
+Test on at least 2 devices:
+- **Stock Android** (Pixel): baseline, everything should work
+- **MIUI/Samsung/OEM** (Xiaomi etc): test for OEM restrictions (autostart, different Settings UI)
+
+Key OEM differences:
+- MIUI blocks background app launches (autostart whitelist needed)
+- Samsung has different Settings layout
+- Some OEMs have chain-launch dialogs (auto-dismissed by OpenAppTool)
+
+### Local LLM Testing Notes
+
+- CPU inference: ~50-60s per round on Pixel 8 Pro
+- GPU may fail ("OpenCL not found") → auto-fallback to CPU
+- LiteRT-LM SDK may crash on tool call parsing → our fallback extracts from error message
+- Force stop loses accessibility service → re-enable after restart
+- Model engine takes ~10s to load on first call
+
+---
 
 ## Prerequisites
 - [ ] Accessibility service enabled
@@ -151,6 +288,55 @@ Design principle: User perspective. INFO tasks → report actual data. ACTION ta
 - [ ] **M48. Lock**: "lock my phone" → system_key(lock), confirms
 - [ ] **M49. Clear notifications**: "clear all my notifications" → clears, confirms
 - [ ] **M50. Phone temp**: "how hot is my phone" → get_device_info(battery) temp OR graceful "not available"
+
+## P. UI — v9 Design Verification
+
+Reference prototype: `/home/nicole/MyGithub/PokeClaw/prototype/dashboard-v9.html`
+
+### P1. Local/Cloud Tabs (toolbar area)
+- [ ] **P1-1. Both tabs render**: "💬 Local AI" and "🤖 Cloud AI" visible below toolbar
+- [ ] **P1-2. Tab highlight**: selected tab has distinct bg+border, unselected is dim
+- [ ] **P1-3. Cloud tab style**: orange tinted bg when selected (not blue)
+- [ ] **P1-4. Tab syncs with model**: when on Local LLM → Local tab highlighted, Cloud LLM → Cloud tab highlighted
+- [ ] **P1-5. Tab filters dropdown**: tap Local tab → dropdown shows local models only; tap Cloud tab → dropdown shows cloud models only
+- [ ] **P1-6. No model → guidance**: Local tab with no model downloaded → "Download models..." link; Cloud tab with no API key → "Configure API key..." link
+
+### P2. Input Area (bottom)
+- [ ] **P2-1. Local Chat/Task toggle**: "💬 Chat" and "🤖 Task" segment buttons visible ABOVE input (not beside)
+- [ ] **P2-2. Input full width**: input bar takes full width, toggle is separate row above
+- [ ] **P2-3. Task mode orange**: tap Task → toggle turns orange, input border orange, input bg tinted, placeholder "Describe a phone task...", send button orange
+- [ ] **P2-4. Chat mode normal**: tap Chat → normal colors, placeholder "Chat with local AI..."
+- [ ] **P2-5. Cloud no toggle**: switch to Cloud LLM → Chat/Task toggle HIDDEN, placeholder "Chat or give a task..."
+- [ ] **P2-6. Send button dim**: when input empty → send button barely visible (low opacity); when text typed → lights up
+- [ ] **P2-7. Same chatroom**: switching Chat↔Task does NOT clear messages, stays in same session
+
+### P3. Quick Tasks Panel (between chat and input)
+- [ ] **P3-1. Panel visible**: "▲ Quick Tasks ▲" handle with centered chevrons visible
+- [ ] **P3-2. Default open**: panel open when new chat starts
+- [ ] **P3-3. Collapsible**: tap handle → panel collapses to just the handle bar; tap again → expands
+- [ ] **P3-4. Five items default**: 5 quick task prompts visible by default
+- [ ] **P3-5. Show more**: "Show more" expands to show all 12 prompts; "Show less" collapses back
+- [ ] **P3-6. Accent bar style**: each prompt has left orange accent bar + full sentence text
+- [ ] **P3-7. Tap fills input**: tap a quick task → text fills input bar
+- [ ] **P3-8. Tap auto-switches mode**: tapping quick task on Local → auto-switches to Task mode
+- [ ] **P3-9. Background section**: "BACKGROUND" label + Monitor & Auto-Reply card visible below quick tasks
+- [ ] **P3-10. Monitor card tap**: tap Monitor card → opens bottom sheet with contact/app/tone form
+
+### P4. Empty State
+- [ ] **P4-1. Local empty**: 🦞 logo + "PokeClaw" + "Local AI" + one-line hint about Chat/Task + 3 chat prompts
+- [ ] **P4-2. Cloud empty**: 🦞 logo + "PokeClaw" + "Cloud AI" + one-line hint about mixed mode + 2 chat + 1 task prompt
+- [ ] **P4-3. No cards/arrows**: NO mode explainer cards, NO bouncing arrow in empty state
+- [ ] **P4-4. Prompt tap**: tap empty state prompt → fills input, correct mode
+
+### P5. No Duplicate Panels
+- [ ] **P5-1. Task mode clean**: when Task mode active → old TaskSkillsPanel does NOT appear alongside QuickTasksPanel
+- [ ] **P5-2. No old ModeTab**: old "Chat | Task" ModeTab rows (from before v9) do NOT render
+- [ ] **P5-3. No stale labels**: "Tap a skill above to start" label does NOT appear
+
+### P6. Theme Consistency
+- [ ] **P6-1. ember_dark colors**: all UI uses ember_dark palette (warm browns/oranges, NOT blue)
+- [ ] **P6-2. Task orange**: task mode uses #E8845A orange, not accent blue
+- [ ] **P6-3. Prompt bar color**: left accent bar on prompts is orange (#E8845A)
 
 ## N. Tinder Automation
 
