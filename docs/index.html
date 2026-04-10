@@ -795,8 +795,8 @@
         <span class="tech-stat-label" data-i18n="stat_stars">GitHub Stars</span>
       </div>
       <div>
-        <span class="tech-stat-number">5</span>
-        <span class="tech-stat-label" data-i18n="stat_releases">Releases</span>
+        <span class="tech-stat-number" id="fork-count">55+</span>
+        <span class="tech-stat-label" data-i18n="stat_forks">Forks</span>
       </div>
       <div>
         <span class="tech-stat-number">100%</span>
@@ -946,7 +946,7 @@
         cmp_data: "Data stays on device",
         cmp_natlang: "Natural language input",
         stat_stars: "GitHub Stars",
-        stat_releases: "Releases",
+        stat_forks: "Forks",
         stat_offline: "Offline Capable",
         stat_tools: "Built-in Tools",
         story_title: "The Story Behind PokeClaw",
@@ -1026,7 +1026,7 @@
         cmp_data: "Data device \u092A\u0930 \u0939\u0940 \u0930\u0939\u0924\u093E \u0939\u0948",
         cmp_natlang: "Natural language input",
         stat_stars: "GitHub Stars",
-        stat_releases: "Releases",
+        stat_forks: "Forks",
         stat_offline: "Offline Capable",
         stat_tools: "Built-in Tools",
         story_title: "PokeClaw \u0915\u0940 \u0915\u0939\u093E\u0928\u0940",
@@ -1106,7 +1106,7 @@
         cmp_data: "\u30C7\u30FC\u30BF\u306F\u30C7\u30D0\u30A4\u30B9\u306B\u7559\u307E\u308B",
         cmp_natlang: "\u81EA\u7136\u8A00\u8A9E\u3067\u5165\u529B",
         stat_stars: "GitHub \u30B9\u30BF\u30FC\u6570",
-        stat_releases: "\u30EA\u30EA\u30FC\u30B9\u6570",
+        stat_forks: "\u30D5\u30A9\u30FC\u30AF\u6570",
         stat_offline: "\u30AA\u30D5\u30E9\u30A4\u30F3\u5BFE\u5FDC",
         stat_tools: "\u5185\u8535\u30C4\u30FC\u30EB\u6570",
         story_title: "PokeClaw \u304C\u3067\u304D\u308B\u307E\u3067",
@@ -1186,7 +1186,7 @@
         cmp_data: "Daten bleiben auf dem Ger\u00E4t",
         cmp_natlang: "Nat\u00FCrlichsprachliche Eingabe",
         stat_stars: "GitHub Stars",
-        stat_releases: "Releases",
+        stat_forks: "Forks",
         stat_offline: "Offline-f\u00E4hig",
         stat_tools: "Eingebaute Tools",
         story_title: "Die Geschichte hinter PokeClaw",
@@ -1266,7 +1266,7 @@
         cmp_data: "\u6578\u64DA\u7559\u55BA\u88DD\u7F6E",
         cmp_natlang: "\u81EA\u7136\u8A9E\u8A00\u8F38\u5165",
         stat_stars: "GitHub Stars",
-        stat_releases: "\u6B63\u5F0F\u7248\u672C",
+        stat_forks: "Forks",
         stat_offline: "\u652F\u63F4\u96E2\u7DDA",
         stat_tools: "\u5167\u5EFA\u5DE5\u5177",
         story_title: "PokeClaw \u80CC\u5F8C\u5605\u6545\u4E8B",
@@ -1330,13 +1330,12 @@
       }, { passive: true });
     })();
 
-    // Live GitHub star count
+    // Live GitHub stats
     fetch('https://api.github.com/repos/agents-io/PokeClaw')
       .then(function(r) { return r.json(); })
       .then(function(d) {
-        if (d.stargazers_count) {
-          document.getElementById('star-count').textContent = d.stargazers_count.toLocaleString() + '+';
-        }
+        if (d.stargazers_count) document.getElementById('star-count').textContent = d.stargazers_count.toLocaleString() + '+';
+        if (d.forks_count) document.getElementById('fork-count').textContent = d.forks_count.toLocaleString() + '+';
       })
       .catch(function() {});
   </script>
