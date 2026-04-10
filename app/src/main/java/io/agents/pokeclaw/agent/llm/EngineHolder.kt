@@ -25,6 +25,10 @@ object EngineHolder {
 
     private var engine: Engine? = null
     private var currentModelPath: String? = null
+    private var currentBackendLabel: String? = null
+
+    private fun backendLabel(backend: Backend): String =
+        if (backend is Backend.CPU) "CPU" else if (backend is Backend.GPU) "GPU" else backend.javaClass.simpleName
 
     /**
      * Return the existing Engine if the model path matches, otherwise close the
@@ -39,7 +43,7 @@ object EngineHolder {
     fun getOrCreate(modelPath: String, cacheDir: String, backend: Backend = Backend.CPU()): Engine {
         val existing = engine
         if (existing != null && currentModelPath == modelPath) {
-            XLog.d(TAG, "getOrCreate: reusing engine for $modelPath")
+            XLog.d(TAG, "getOrCreate: reusing engine for $modelPath (${currentBackendLabel ?: "unknown"})")
             return existing
         }
 
@@ -66,7 +70,8 @@ object EngineHolder {
             val newEngine = Engine(engineConfig).also { it.initialize() }
             engine = newEngine
             currentModelPath = modelPath
-            XLog.i(TAG, "getOrCreate: engine ready for $modelPath")
+            currentBackendLabel = backendLabel(backend)
+            XLog.i(TAG, "getOrCreate: engine ready for $modelPath (${currentBackendLabel})")
             newEngine
         } catch (e: Exception) {
             XLog.e(TAG, "getOrCreate: failed to create engine for $modelPath", e)
@@ -89,10 +94,17 @@ object EngineHolder {
         }
         engine = null
         currentModelPath = null
+        currentBackendLabel = null
         XLog.i(TAG, "close: done")
     }
 
     /** Returns true if an engine is live for the given model path. */
     @Synchronized
     fun isReady(modelPath: String): Boolean = engine != null && currentModelPath == modelPath
+
+    /** Returns the actual backend label of the current shared engine, if any. */
+    @Synchronized
+    fun getBackendLabel(modelPath: String? = null): String? {
+        return if (modelPath == null || currentModelPath == modelPath) currentBackendLabel else null
+    }
 }

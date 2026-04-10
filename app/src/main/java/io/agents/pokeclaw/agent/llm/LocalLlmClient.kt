@@ -51,8 +51,14 @@ class LocalLlmClient(private val config: AgentConfig) : LlmClient {
     private fun ensureEngine() {
         val modelPath = config.baseUrl
         val context = ClawApplication.instance
-        // If GPU previously failed during inference, force CPU
-        val backend = if (gpuFailed) com.google.ai.edge.litertlm.Backend.CPU() else com.google.ai.edge.litertlm.Backend.GPU()
+        val savedBackend = io.agents.pokeclaw.utils.KVUtils.getLocalBackendPreference().uppercase()
+        // If GPU previously failed during inference, or the app already learned this
+        // device/model should run on CPU, skip the GPU path entirely.
+        val backend = if (gpuFailed || savedBackend == "CPU") {
+            com.google.ai.edge.litertlm.Backend.CPU()
+        } else {
+            com.google.ai.edge.litertlm.Backend.GPU()
+        }
 
         try {
             val shared = EngineHolder.getOrCreate(modelPath, context.cacheDir.path, backend)
@@ -73,6 +79,7 @@ class LocalLlmClient(private val config: AgentConfig) : LlmClient {
     private fun fallbackToCpu() {
         XLog.w(TAG, "fallbackToCpu: GPU inference failed, switching to CPU")
         gpuFailed = true
+        io.agents.pokeclaw.utils.KVUtils.setLocalBackendPreference("CPU")
         try { conversation?.close() } catch (_: Exception) {}
         conversation = null
         EngineHolder.close()

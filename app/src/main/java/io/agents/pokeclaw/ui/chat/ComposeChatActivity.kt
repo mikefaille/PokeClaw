@@ -281,7 +281,10 @@ class ComposeChatActivity : ComponentActivity() {
                         )
                     )
                     isModelReady = true
-                    runOnUiThread { setButtonsEnabled(true) }
+                    runOnUiThread {
+                        updateLocalModelStatus(currentModelPath)
+                        setButtonsEnabled(true)
+                    }
                 } catch (e: Exception) {
                     XLog.e(TAG, "Failed to recreate conversation", e)
                     val isSessionConflict = e.message?.contains("session already exists") == true
@@ -453,13 +456,20 @@ class ComposeChatActivity : ComponentActivity() {
     }
 
     private fun loadModel(modelPath: String) {
+        val preferredBackend = KVUtils.getLocalBackendPreference().uppercase()
+        if (preferredBackend == "CPU") {
+            XLog.i(TAG, "loadModel: using saved CPU preference for local model")
+            loadModelWithBackend(modelPath, Backend.CPU())
+            return
+        }
         try {
             // Try GPU first for better performance
             loadModelWithBackend(modelPath, Backend.GPU())
         } catch (gpuError: Exception) {
             XLog.w(TAG, "GPU load failed: ${gpuError.message}, falling back to CPU")
             try {
-                engine?.close()
+                KVUtils.setLocalBackendPreference("CPU")
+                EngineHolder.close()
                 engine = null
                 loadModelWithBackend(modelPath, Backend.CPU())
             } catch (cpuError: Exception) {
@@ -512,11 +522,8 @@ class ComposeChatActivity : ComponentActivity() {
 
             isModelReady = true
             loadedModelPath = modelPath
-            val modelInfo = LocalModelManager.AVAILABLE_MODELS.find { modelPath.endsWith(it.fileName) }
-            val modelName = modelInfo?.displayName ?: modelPath.substringAfterLast('/').substringBeforeLast('.')
-            val backendLabel = if (backend is Backend.CPU) "CPU" else "GPU"
             runOnUiThread {
-                _modelStatus.value = "● $modelName · $backendLabel"
+                updateLocalModelStatus(modelPath)
                 setButtonsEnabled(true)
             }
         } catch (e: Exception) {
@@ -593,9 +600,10 @@ class ComposeChatActivity : ComponentActivity() {
                         || e.message?.contains("nativeSendMessage") == true)) {
                     XLog.w(TAG, "GPU inference failed, falling back to CPU: ${e.message}")
                     try {
+                        KVUtils.setLocalBackendPreference("CPU")
                         conversation?.close()
                         conversation = null
-                        engine?.close()
+                        EngineHolder.close()
                         engine = null
                         val modelPath = KVUtils.getLocalModelPath()
                         loadModelWithBackend(modelPath, com.google.ai.edge.litertlm.Backend.CPU())
@@ -610,7 +618,7 @@ class ComposeChatActivity : ComponentActivity() {
                             if (idx >= 0) _messages[idx] = _messages[idx].copy(content = responseText, modelName = cpuModelTag)
                             _isProcessing.value = false
                             _sessionTokens.value += inputTokensEst + outputTokensEst
-                            _modelStatus.value = _modelStatus.value.replace("GPU", "CPU")
+                            updateLocalModelStatus(modelPath)
                             saveChat()
                         }
                         return@submit
@@ -1010,6 +1018,17 @@ class ComposeChatActivity : ComponentActivity() {
 
     private fun addUser(text: String) { _messages.add(ChatMessage(ChatMessage.Role.USER, text)) }
     private fun addSystem(text: String) { _messages.add(ChatMessage(ChatMessage.Role.SYSTEM, text)) }
+
+    private fun updateLocalModelStatus(modelPath: String?) {
+        if (modelPath.isNullOrEmpty()) {
+            _modelStatus.value = "No model selected"
+            return
+        }
+        val modelInfo = LocalModelManager.AVAILABLE_MODELS.find { modelPath.endsWith(it.fileName) }
+        val modelName = modelInfo?.displayName ?: modelPath.substringAfterLast('/').substringBeforeLast('.')
+        val backendLabel = EngineHolder.getBackendLabel(modelPath) ?: "On-device"
+        _modelStatus.value = "● $modelName · $backendLabel"
+    }
 
     private fun setButtonsEnabled(enabled: Boolean) {
         _inputEnabled.value = enabled

@@ -170,6 +170,7 @@ object KVUtils {
     private const val KEY_LLM_MODEL_NAME = "KEY_LLM_MODEL_NAME"
     private const val KEY_LLM_PROVIDER = "KEY_LLM_PROVIDER"
     private const val KEY_LOCAL_MODEL_PATH = "KEY_LOCAL_MODEL_PATH"
+    private const val KEY_LOCAL_BACKEND_PREFERENCE = "KEY_LOCAL_BACKEND_PREFERENCE"
 
     fun getLlmApiKey(): String = getString(KEY_LLM_API_KEY, "")
     fun setLlmApiKey(value: String) = putString(KEY_LLM_API_KEY, value)
@@ -187,6 +188,8 @@ object KVUtils {
     fun setLlmProvider(value: String) = putString(KEY_LLM_PROVIDER, value)
     fun getLocalModelPath(): String = getString(KEY_LOCAL_MODEL_PATH, "")
     fun setLocalModelPath(value: String) = putString(KEY_LOCAL_MODEL_PATH, value)
+    fun getLocalBackendPreference(): String = getString(KEY_LOCAL_BACKEND_PREFERENCE, "")
+    fun setLocalBackendPreference(value: String) = putString(KEY_LOCAL_BACKEND_PREFERENCE, value)
 
     // ==================== Independent Default Models ====================
     // Local and Cloud each have their own default model config.
