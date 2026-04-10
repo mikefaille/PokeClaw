@@ -61,22 +61,70 @@ class TaskBudget(
 
         private const val KEY_MAX_TOKENS = "KEY_TASK_MAX_TOKENS"
         private const val KEY_MAX_COST = "KEY_TASK_MAX_COST_USD"
+        private const val KEY_DEFAULTS_VERSION = "KEY_TASK_BUDGET_DEFAULTS_VERSION"
 
-        const val DEFAULT_MAX_TOKENS = 100_000
-        const val DEFAULT_MAX_COST_USD = 0.50
+        private const val LEGACY_DEFAULT_MAX_TOKENS = 100_000
+        private const val LEGACY_DEFAULT_MAX_COST_USD = 0.50
+        private const val CURRENT_DEFAULTS_VERSION = 2
+
+        const val DEFAULT_MAX_TOKENS = 250_000
+        const val DEFAULT_MAX_COST_USD = 1.00
 
         /**
          * Create a TaskBudget from user settings.
          */
         fun fromSettings(): TaskBudget {
+            maybeUpgradeLegacyDefaults()
             val maxTokens = KVUtils.getInt(KEY_MAX_TOKENS, DEFAULT_MAX_TOKENS)
             val maxCost = KVUtils.getDouble(KEY_MAX_COST, DEFAULT_MAX_COST_USD)
             return TaskBudget(maxTokens, maxCost)
         }
 
-        fun saveMaxTokens(value: Int) = KVUtils.putInt(KEY_MAX_TOKENS, value)
-        fun saveMaxCost(value: Double) = KVUtils.putDouble(KEY_MAX_COST, value)
-        fun getMaxTokens(): Int = KVUtils.getInt(KEY_MAX_TOKENS, DEFAULT_MAX_TOKENS)
-        fun getMaxCost(): Double = KVUtils.getDouble(KEY_MAX_COST, DEFAULT_MAX_COST_USD)
+        fun saveMaxTokens(value: Int): Boolean {
+            markDefaultsCurrent()
+            return KVUtils.putInt(KEY_MAX_TOKENS, value)
+        }
+
+        fun saveMaxCost(value: Double): Boolean {
+            markDefaultsCurrent()
+            return KVUtils.putDouble(KEY_MAX_COST, value)
+        }
+
+        fun getMaxTokens(): Int {
+            maybeUpgradeLegacyDefaults()
+            return KVUtils.getInt(KEY_MAX_TOKENS, DEFAULT_MAX_TOKENS)
+        }
+
+        fun getMaxCost(): Double {
+            maybeUpgradeLegacyDefaults()
+            return KVUtils.getDouble(KEY_MAX_COST, DEFAULT_MAX_COST_USD)
+        }
+
+        private fun maybeUpgradeLegacyDefaults() {
+            if (KVUtils.getInt(KEY_DEFAULTS_VERSION, 0) >= CURRENT_DEFAULTS_VERSION) return
+
+            val hasTokenSetting = KVUtils.contains(KEY_MAX_TOKENS)
+            val hasCostSetting = KVUtils.contains(KEY_MAX_COST)
+            val currentTokens = KVUtils.getInt(KEY_MAX_TOKENS, LEGACY_DEFAULT_MAX_TOKENS)
+            val currentCost = KVUtils.getDouble(KEY_MAX_COST, LEGACY_DEFAULT_MAX_COST_USD)
+
+            if (!hasTokenSetting || currentTokens == LEGACY_DEFAULT_MAX_TOKENS) {
+                KVUtils.putInt(KEY_MAX_TOKENS, DEFAULT_MAX_TOKENS)
+            }
+            if (!hasCostSetting || kotlin.math.abs(currentCost - LEGACY_DEFAULT_MAX_COST_USD) < 0.000001) {
+                KVUtils.putDouble(KEY_MAX_COST, DEFAULT_MAX_COST_USD)
+            }
+
+            markDefaultsCurrent()
+            XLog.i(
+                TAG,
+                "Budget defaults migrated to ${DEFAULT_MAX_TOKENS} tokens / $$DEFAULT_MAX_COST_USD " +
+                    "(previous tokens=$currentTokens, cost=$currentCost, hasToken=$hasTokenSetting, hasCost=$hasCostSetting)"
+            )
+        }
+
+        private fun markDefaultsCurrent() {
+            KVUtils.putInt(KEY_DEFAULTS_VERSION, CURRENT_DEFAULTS_VERSION)
+        }
     }
 }

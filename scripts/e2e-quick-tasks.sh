@@ -54,7 +54,7 @@ configure_mode() {
 classify_blocked() {
     local message_lower
     message_lower="$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')"
-    printf '%s' "$message_lower" | grep -qE "not installed|cannot resolve|can't resolve|could not resolve|contact .* not found|couldn't find .*contact|failed to find .*contact|failed to send .*contact|notification access|accessibility service is not running|no local model|model file.*missing"
+    printf '%s' "$message_lower" | grep -qE "not installed|cannot resolve|can't resolve|could not resolve|contact .* not found|couldn't find .*contact|failed to find .*contact|failed to send .*contact|notification access|accessibility service is not running|no local model|model file.*missing|__system_dialog_blocked__|system dialog may be blocking the screen"
 }
 
 record_result() {
@@ -96,9 +96,10 @@ run() {
 
         local log
         log="$(adb logcat -d 2>/dev/null | grep "$pid" || true)"
-        local comp err already ans tools err_detail
+        local comp err blocked already ans tools err_detail
         comp="$(printf '%s\n' "$log" | grep 'onComplete:.*answer=' | tail -1 || true)"
         err="$(printf '%s\n' "$log" | grep 'onError' | tail -1 || true)"
+        blocked="$(printf '%s\n' "$log" | grep 'onSystemDialogBlocked' | tail -1 || true)"
         already="$(printf '%s\n' "$log" | grep 'already running' | tail -1 || true)"
 
         if [ -n "$already" ]; then
@@ -110,10 +111,16 @@ run() {
             continue
         fi
 
+        if [ -n "$blocked" ]; then
+            record_result "BLOCKED" "$i" "system dialog blocked foreground automation"
+            BLOCKED=$((BLOCKED + 1))
+            return
+        fi
+
         if [ -n "$comp" ]; then
             ans="$(printf '%s\n' "$comp" | sed 's/.*answer=//')"
-            tools="$(printf '%s\n' "$log" | grep 'onToolCall:' | sed 's/.*onToolCall: //' | tr '\n' ' ')"
-            if printf '%s' "$ans" | grep -qi 'budget limit reached'; then
+            tools="$(printf '%s\n' "$log" | grep 'onToolCall:' | sed 's/.*onToolCall: //' | tr '\n' ' ' || true)"
+            if printf '%s' "$ans" | grep -qiE 'budget limit reached|task cancelled|task stopped:'; then
                 record_result "FAIL" "$i" "$ans" "$tools"
                 FAIL=$((FAIL + 1))
             elif classify_blocked "$ans"; then

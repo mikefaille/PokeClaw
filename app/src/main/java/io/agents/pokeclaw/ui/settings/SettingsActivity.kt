@@ -526,9 +526,11 @@ class SettingsActivity : BaseActivity() {
         }
         layout.addView(tokenLabel)
 
-        val tokenOptions = arrayOf("10K", "50K", "100K", "200K", "500K")
-        val tokenValues = intArrayOf(10_000, 50_000, 100_000, 200_000, 500_000)
-        val selectedTokenIndex = tokenValues.indexOfFirst { it == currentTokens }.takeIf { it >= 0 } ?: 2
+        val tokenOptions = arrayOf("10K", "50K", "100K", "200K", "250K", "500K")
+        val tokenValues = intArrayOf(10_000, 50_000, 100_000, 200_000, 250_000, 500_000)
+        val selectedTokenIndex = tokenValues.indexOfFirst { it == currentTokens }.takeIf { it >= 0 }
+            ?: tokenValues.indices.minByOrNull { kotlin.math.abs(tokenValues[it] - currentTokens) }
+            ?: 2
 
         val tokenSpinner = android.widget.Spinner(this).apply {
             adapter = android.widget.ArrayAdapter(this@SettingsActivity, android.R.layout.simple_spinner_dropdown_item, tokenOptions)
