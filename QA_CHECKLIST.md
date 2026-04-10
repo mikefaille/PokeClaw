@@ -229,6 +229,10 @@ This checklist is **not** yet a fully rerun 100% green master sheet. The honest 
   - Accessibility reconnect + permission return flows
   - Task stop / auto-return / same-session preservation
   - Explicit in-app search and email-compose guards
+  - Phase 1 chat-runtime extraction smoke:
+    - Cloud runtime rehydrate after relaunch
+    - Local runtime rehydrate after relaunch
+    - Local chat send with GPU→CPU fallback
 - **Covered, but still environment-sensitive**
   - WhatsApp send flows
   - Local contact-specific send/call flows
@@ -357,7 +361,7 @@ When in doubt, rerun the smaller bundle first, then expand only if something dri
 - [ ] **H2-c. Keyboard in Models screen — Model Name**: switch to Custom provider → tap Model Name → keyboard doesn't block field
 - [ ] **H3. Layout sizes**: all text/buttons normal size (dp not pt)
 - [ ] **H4. Model switcher**: tap model bar → dropdown → switch model → status updates
-- [ ] **H4-b. Local backend label is truthful**: Local model falls back GPU→CPU → top-left model status updates to `CPU`, not stale `GPU`
+- [x] **H4-b. Local backend label is truthful**: Local model falls back GPU→CPU → top-left model status updates to `CPU`, not stale `GPU`
 - [ ] **H5. New chat**: tap pencil icon → clears messages → shows welcome screen
 - [ ] **H6. Rename chat**: long-press session in sidebar → rename option → type new name → name updates in sidebar + persists after app restart
 - [ ] **H7. Delete chat**: long-press session in sidebar → delete → session removed from sidebar + file deleted
@@ -537,7 +541,7 @@ Layer 1 broadcast bypasses UI routing. Only Layer 3 catches routing bugs.
 - [ ] **Q2-3. Cloud no toggle**: Cloud tab → verify NO Chat/Task toggle visible → all input goes to unified pipeline
 
 ### Q3. Local Tab Send Routing
-- [ ] **Q3-1. Local chat**: Local tab → Chat mode → type "hello" → tap send → AI response (routed via onSendChat to local LLM)
+- [x] **Q3-1. Local chat**: Local tab → Chat mode → type "hello" → tap send → AI response (routed via onSendChat to local LLM)
 - [ ] **Q3-2. Local task**: Local tab → Task mode → type "how much battery left" → tap send → task executes (routed via onSendTask)
 - [ ] **Q3-3. Mode switch**: Local tab → start in Chat → type "hello" → get response → tap Task → type task → executes correctly
 - [ ] **Q3-4. Chat doesn't trigger tasks**: Local tab → Chat mode → type "open YouTube" → should get conversational reply, NOT open YouTube
@@ -547,8 +551,8 @@ Layer 1 broadcast bypasses UI routing. Only Layer 3 catches routing bugs.
 - [ ] **Q4-2. Quick task in Cloud**: Cloud tab → tap quick task → input fills → tap send → task executes
 
 ### Q5. Routing Regression Guards
-- [ ] **Q5-1. No OpenCL crash on Local chat**: Local tab → Chat mode → send message → should NOT get "OpenCL not found" (must use CPU fallback)
-- [ ] **Q5-1b. GPU fallback updates UI label**: Local tab → GPU load/inference fails → fallback to CPU → top-left model status changes to CPU
+- [x] **Q5-1. No OpenCL crash on Local chat**: Local tab → Chat mode → send message → should NOT get "OpenCL not found" (must use CPU fallback)
+- [x] **Q5-1b. GPU fallback updates UI label**: Local tab → GPU load/inference fails → fallback to CPU → top-left model status changes to CPU
 - [ ] **Q5-2. No API error on Cloud task**: Cloud tab → send task → should NOT get "invalid_request_error" 
 - [ ] **Q5-3. Tab switch mid-conversation**: send message on Cloud → switch to Local → send message → no crash, correct routing for each
 
@@ -883,6 +887,9 @@ Format: `[date] [status] [test-id] description`
 [2026-04-10] [PASS]    S5/M33  Cloud task `Copy the latest email subject and Google it` → `get_notifications` → `clipboard(set)` → `open_app(com.android.chrome)` → search in Chrome → screenshot/search-results visible → `finish`; after legacy-budget migration this completed in 15 rounds / 110.2K tokens instead of hard-stopping at the old 100K ceiling
 [2026-04-10] [PASS]    S7/M51  Committed-state rerun `Open Reddit and search for pokeclaw` → `open_app(com.reddit.frontpage)` → `input_text(pokeclaw)` → results visible → `finish`; completed in 12 rounds / 91.9K tokens on the latest hardening branch
 [2026-04-10] [PASS]    Cloud quick-task sweep (effective final) on branch `hardening/behavior-safe-2026-04-09` @ `a0a88ab`: `18 PASS / 0 FAIL / 2 BLOCKED / 0 TIMEOUT / 20 TOTAL`. Blocked items are environment-driven (`S1` YouTube permission dialog, `Call Mom` missing contact). Base sweep log: `/tmp/pokeclaw-cloud-quick-tasks-20260410-full.log`; `S5` was rerun after the budget migration and passed at 110.2K tokens
+[2026-04-10] [PASS]    Phase1-r1  Architecture refactor smoke — relaunch via `SplashActivity` with Cloud config active lands on `ComposeChatActivity` showing `● gpt-4.1 · Cloud` and the unified Cloud placeholder, confirming chat runtime rehydrate still works after `ChatSessionController` extraction
+[2026-04-10] [PASS]    Phase1-r2  Architecture refactor smoke — copied the existing Edge Gallery Gemma model into PokeClaw's sandbox, switched provider to `LOCAL`, relaunched, and confirmed `ComposeChatActivity` rehydrated into Local mode with `Chat with local AI...` plus top status `● gemma4_2b_v09_obfus_fix_all_modalities_thinking · GPU`
+[2026-04-10] [PASS]    Q3-1/Q5-1/Q5-1b/Phase1-r3  Local chat after `ChatSessionController` extraction: UI send produced a real assistant reply (`Hello! How can I help you today?`), GPU inference transparently fell back to CPU, and both the top status pill and assistant model tag updated to `CPU` instead of stale `GPU`
 ```
 
 ### Bugs Found During v9 QA
