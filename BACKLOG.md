@@ -18,7 +18,6 @@ Priority: `P0` = blocks users, fix now. `P1` = next up. `P2` = when we get to it
 
 - [ ] **P1** Local model import UX: keep shared-storage `.litertlm` import easy and explain clearly why other apps' `Android/data/...` sandboxes (for example Edge Gallery) are not directly readable
 - [ ] **P1** Tinder automation: auto swipe + monitor matches + auto-reply using same monitor architecture as WhatsApp
-- [ ] **P2** Chat bubble timestamps: show per-message time under AI/user bubbles, IG-chatroom style, alongside the existing model tag
 - [x] ~~**P1** NLP Playbooks (Layer 2): 5 playbooks in system prompt (Search in App, Navigate Settings, Compose Email, Read Screen, Read Notifications)~~ — done 2026-04-08
 - [x] ~~**P1** In-chat task auto-return~~ — done 2026-04-08
 - [x] ~~**P2** Monitor stays in app~~ — done 2026-04-08, removed GLOBAL_ACTION_HOME
@@ -60,3 +59,4 @@ _Move completed items here with date._
 - [x] ~~2026-04-08: M1-M12 QA: 10/12 PASS, 2 PARTIAL (M9 camera, M12 system dialog)~~
 - [x] ~~2026-04-08: NLP Playbooks Layer 2: 5 playbooks (Search, Settings, Email, Screen, Notifications)~~
 - [x] ~~2026-04-08: Tinder research: UI structure documented, workflow designed, needs login~~
+- [x] ~~2026-04-10: Chat bubble timestamps~~ — IG-style per-message footer landed for user + assistant bubbles, with hidden timestamp metadata persisted in markdown history so relaunch/reload keeps stable times

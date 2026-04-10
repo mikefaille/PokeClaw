@@ -247,6 +247,10 @@ This checklist is **not** yet a fully rerun 100% green master sheet. The honest 
     - Shared local runtime still cold-launches into `ComposeChatActivity` with truthful `CPU` backend status
     - Real local UI send still works after runtime consolidation: `say pong` → `Pong! 🏓`
     - Assistant bubble model tag remains aligned with the actual backend after send
+  - Chat bubble metadata smoke:
+    - User bubbles render a subtle IG-style time footer under the bubble
+    - Assistant bubbles render `model name · time` under the bubble
+    - Saved markdown history persists per-message timestamps via hidden metadata comments
 - **Covered, but still environment-sensitive**
   - WhatsApp send flows
   - Local contact-specific send/call flows
@@ -291,6 +295,11 @@ Do **not** rerun the entire world after every refactor. Rerun the right bundle f
   - `Q3-1`, `Q5-1`, `Q5-1b`
   - `LQ1-LQ13`
   - one real Local UI send smoke using live bounds from the current `uiautomator dump`
+- **Chat history / bubble metadata changes**
+  - `P7-1`, `P7-2`, `P7-3`
+  - `Q3-1`
+  - `Q7-7`
+  - one persisted markdown-history spot check for `<!-- pokeclaw:timestamp=... -->`
 - **Task lifecycle / orchestration changes**
   - `F1-F6`
   - `I1-I3`
@@ -542,6 +551,11 @@ Reference prototype: `/home/nicole/MyGithub/PokeClaw/prototype/dashboard-v9.html
 - [ ] **P6-1. Theme-aware colors**: all UI uses `colors.accent` (theme-dependent), NOT hardcoded orange
 - [ ] **P6-2. Task mode styling**: task mode input area uses taskBg (#1A1410) + accent border + accent send button
 - [ ] **P6-3. Send button states**: empty = dim (alpha 0.35, bg color), chat active = userBubble color, task active = accent color
+
+### P7. Chat Bubble Metadata
+- [ ] **P7-1. User footer time**: user bubbles show a subtle time footer under the bubble (IG-chatroom style)
+- [ ] **P7-2. Assistant footer metadata**: assistant bubbles show `model name · time` when a model tag exists
+- [ ] **P7-3. History restore keeps timestamps**: relaunch or reload a saved conversation → visible bubble times stay stable instead of resetting to "now"
 
 ## Q. UI E2E — Full Pipeline (Layer 3)
 
@@ -916,6 +930,8 @@ Format: `[date] [status] [test-id] description`
 [2026-04-10] [FIXED]   K4-r1  Notification-listener foreground return is now gated by a pending permission-flow flag, so listener reconnects no longer blindly foreground app Settings unless the user actually came from the in-app permission flow
 [2026-04-10] [PASS]    Phase4-r1/H4-b  After local-runtime consolidation, cold launch still lands on `ComposeChatActivity` with truthful local status `● gemma4_2b_v09_obfus_fix_all_modalities_thinking · CPU`
 [2026-04-10] [PASS]    Phase4-r2/Q3-1/Q5-1/Q5-1b  Local UI send smoke after runtime consolidation: typed `say pong`, tapped the live send-button bounds, and received assistant reply `Pong! 🏓`; both top status and assistant bubble tag remained `gemma4_2b_v09_obfus_fix_all_modalities_thinking (CPU)`
+[2026-04-10] [PASS]    P7-1/P7-2  Chat bubble metadata smoke: after relaunching `ComposeChatActivity`, user bubbles render a subtle time footer (`5:57 p.m.`) and assistant bubbles render `gemma4_2b_v09_obfus_fix_all_modalities_thinking (CPU) · 5:57 p.m.` under the reply bubble
+[2026-04-10] [PASS]    P7-3/Q7-7  Saved chat history now persists per-message timestamps in markdown via hidden `<!-- pokeclaw:timestamp=... -->` comments, so reloaded conversations keep stable bubble times instead of resetting to the current clock
 [2026-04-10] [NOTE]    QA-wf-r2  Device-state guard for Compose UI smoke: if notification shade or another app steals foreground, collapse/foreground PokeClaw again before judging the refactor; if IME moves the input bar, re-dump live bounds instead of reusing stale tap coordinates
 ```
 

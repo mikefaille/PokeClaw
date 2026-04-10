@@ -3,6 +3,7 @@
 
 package io.agents.pokeclaw.ui.chat
 
+import android.text.format.DateUtils
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -42,6 +43,9 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 /**
  * PokeClaw Chat Screen — Jetpack Compose
@@ -607,8 +611,8 @@ private fun MessageList(
         items(messages.size) { index ->
             val message = messages[index]
             when (message.role) {
-                ChatMessage.Role.USER -> UserBubble(message.content, colors)
-                ChatMessage.Role.ASSISTANT -> AssistantBubble(message.content, colors, message.modelName)
+                ChatMessage.Role.USER -> UserBubble(message.content, message.timestamp, colors)
+                ChatMessage.Role.ASSISTANT -> AssistantBubble(message.content, message.timestamp, colors, message.modelName)
                 ChatMessage.Role.SYSTEM -> SystemMessage(message.content, colors)
                 ChatMessage.Role.TOOL_GROUP -> ToolGroup(message, colors)
             }
@@ -619,30 +623,39 @@ private fun MessageList(
 // ======================== BUBBLES ========================
 
 @Composable
-private fun UserBubble(text: String, colors: PokeclawColors) {
-    Row(
+private fun UserBubble(text: String, timestamp: Long, colors: PokeclawColors) {
+    Column(
         modifier = Modifier
             .fillMaxWidth()
             .padding(start = 64.dp, end = 14.dp, top = 3.dp, bottom = 3.dp),
-        horizontalArrangement = Arrangement.End,
     ) {
-        Surface(
-            color = colors.userBubble,
-            shape = RoundedCornerShape(20.dp, 20.dp, 4.dp, 20.dp),
-        ) {
-            Text(
-                text = text,
-                color = colors.userText,
-                fontSize = 15.sp,
-                lineHeight = 21.sp,
-                modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
-            )
+        Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
+            Surface(
+                color = colors.userBubble,
+                shape = RoundedCornerShape(20.dp, 20.dp, 4.dp, 20.dp),
+            ) {
+                Text(
+                    text = text,
+                    color = colors.userText,
+                    fontSize = 15.sp,
+                    lineHeight = 21.sp,
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                )
+            }
         }
+        Text(
+            text = formatBubbleTimestamp(timestamp),
+            fontSize = 9.sp,
+            color = colors.textTertiary,
+            modifier = Modifier
+                .align(Alignment.End)
+                .padding(end = 6.dp, top = 1.dp, bottom = 2.dp),
+        )
     }
 }
 
 @Composable
-private fun AssistantBubble(text: String, colors: PokeclawColors, modelName: String? = null) {
+private fun AssistantBubble(text: String, timestamp: Long, colors: PokeclawColors, modelName: String? = null) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -690,16 +703,24 @@ private fun AssistantBubble(text: String, colors: PokeclawColors, modelName: Str
                 }
             }
         }
-        // Model name tag below bubble
-        if (!modelName.isNullOrEmpty() && text != "...") {
+        if (text != "...") {
+            val footer = listOfNotNull(
+                modelName?.takeIf { it.isNotBlank() },
+                formatBubbleTimestamp(timestamp)
+            ).joinToString(" · ")
             Text(
-                text = modelName,
+                text = footer,
                 fontSize = 9.sp,
                 color = colors.textTertiary,
                 modifier = Modifier.padding(start = 40.dp, top = 1.dp, bottom = 2.dp),
             )
         }
     }
+}
+
+private fun formatBubbleTimestamp(timestamp: Long): String {
+    val pattern = if (DateUtils.isToday(timestamp)) "h:mm a" else "MMM d, h:mm a"
+    return SimpleDateFormat(pattern, Locale.getDefault()).format(Date(timestamp))
 }
 
 @Composable
@@ -1766,7 +1787,7 @@ private fun TaskSkillsPanel(
             items(taskMessages.size) { index ->
                 val msg = taskMessages[index]
                 if (msg.role == ChatMessage.Role.USER) {
-                    UserBubble(msg.content, colors)
+                    UserBubble(msg.content, msg.timestamp, colors)
                 } else {
                     SystemMessage(msg.content, colors)
                 }

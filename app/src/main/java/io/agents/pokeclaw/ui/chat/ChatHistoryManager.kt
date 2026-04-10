@@ -33,6 +33,10 @@ import java.util.Locale
  */
 object ChatHistoryManager {
 
+    private const val MESSAGE_TIMESTAMP_PREFIX = "<!-- pokeclaw:timestamp="
+    private const val MESSAGE_TIMESTAMP_SUFFIX = " -->"
+    private val frontmatterDateFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US)
+
     data class ConversationSummary(
         val id: String,
         val title: String,
@@ -75,6 +79,7 @@ object ChatHistoryManager {
             when (msg.role) {
                 ChatMessage.Role.USER -> {
                     sb.appendLine("## User")
+                    sb.appendLine(serializeTimestamp(msg.timestamp))
                     sb.appendLine(msg.content)
                     sb.appendLine()
                 }
@@ -84,16 +89,19 @@ object ChatHistoryManager {
                     } else {
                         sb.appendLine("## 🦞 Assistant")
                     }
+                    sb.appendLine(serializeTimestamp(msg.timestamp))
                     sb.appendLine(msg.content)
                     sb.appendLine()
                 }
                 ChatMessage.Role.SYSTEM -> {
                     sb.appendLine("## System")
+                    sb.appendLine(serializeTimestamp(msg.timestamp))
                     sb.appendLine(msg.content)
                     sb.appendLine()
                 }
                 ChatMessage.Role.TOOL_GROUP -> {
                     sb.appendLine("## Tools")
+                    sb.appendLine(serializeTimestamp(msg.timestamp))
                     msg.toolSteps?.forEach { step ->
                         val icon = if (step.success) "✓" else "○"
                         sb.appendLine("- $icon ${step.toolName} → ${step.summary}")
@@ -128,8 +136,10 @@ object ChatHistoryManager {
         val lines = file.readLines()
 
         var inFrontmatter = false
+        var fallbackConversationTimestamp = file.lastModified().takeIf { it > 0L } ?: System.currentTimeMillis()
         var currentRole: ChatMessage.Role? = null
         var currentModelName: String? = null
+        var currentTimestamp: Long? = null
         val contentBuilder = StringBuilder()
 
         for (line in lines) {
@@ -137,30 +147,44 @@ object ChatHistoryManager {
                 if (!inFrontmatter) { inFrontmatter = true; continue }
                 else { inFrontmatter = false; continue }
             }
-            if (inFrontmatter) continue
+            if (inFrontmatter) {
+                if (line.startsWith("created: ")) {
+                    parseFrontmatterTimestamp(line.removePrefix("created: "))?.let {
+                        fallbackConversationTimestamp = it
+                    }
+                }
+                continue
+            }
 
             when {
                 line.startsWith("## User") -> {
-                    flushMessage(messages, currentRole, contentBuilder, currentModelName)
+                    flushMessage(messages, currentRole, contentBuilder, currentModelName, currentTimestamp, fallbackConversationTimestamp)
                     currentRole = ChatMessage.Role.USER
                     currentModelName = null
+                    currentTimestamp = null
                 }
                 line.startsWith("## 🦞 Assistant") -> {
-                    flushMessage(messages, currentRole, contentBuilder, currentModelName)
+                    flushMessage(messages, currentRole, contentBuilder, currentModelName, currentTimestamp, fallbackConversationTimestamp)
                     currentRole = ChatMessage.Role.ASSISTANT
                     // Extract model name from "## 🦞 Assistant [ModelName]"
                     val bracketMatch = Regex("\\[(.+)]").find(line)
                     currentModelName = bracketMatch?.groupValues?.get(1)
+                    currentTimestamp = null
                 }
                 line.startsWith("## System") -> {
-                    flushMessage(messages, currentRole, contentBuilder, currentModelName)
+                    flushMessage(messages, currentRole, contentBuilder, currentModelName, currentTimestamp, fallbackConversationTimestamp)
                     currentRole = ChatMessage.Role.SYSTEM
                     currentModelName = null
+                    currentTimestamp = null
                 }
                 line.startsWith("## Tools") -> {
-                    flushMessage(messages, currentRole, contentBuilder, currentModelName)
+                    flushMessage(messages, currentRole, contentBuilder, currentModelName, currentTimestamp, fallbackConversationTimestamp)
                     currentRole = ChatMessage.Role.TOOL_GROUP
                     currentModelName = null
+                    currentTimestamp = null
+                }
+                currentRole != null && line.startsWith(MESSAGE_TIMESTAMP_PREFIX) -> {
+                    currentTimestamp = parseMessageTimestamp(line)
                 }
                 else -> {
                     if (currentRole != null && line.isNotBlank()) {
@@ -170,15 +194,48 @@ object ChatHistoryManager {
                 }
             }
         }
-        flushMessage(messages, currentRole, contentBuilder, currentModelName)
+        flushMessage(messages, currentRole, contentBuilder, currentModelName, currentTimestamp, fallbackConversationTimestamp)
 
         return messages
     }
 
-    private fun flushMessage(messages: MutableList<ChatMessage>, role: ChatMessage.Role?, content: StringBuilder, modelName: String? = null) {
+    private fun flushMessage(
+        messages: MutableList<ChatMessage>,
+        role: ChatMessage.Role?,
+        content: StringBuilder,
+        modelName: String? = null,
+        timestamp: Long? = null,
+        fallbackConversationTimestamp: Long
+    ) {
         if (role != null && content.isNotEmpty()) {
-            messages.add(ChatMessage(role, content.toString().trim(), modelName = modelName))
+            val resolvedTimestamp = timestamp ?: (fallbackConversationTimestamp + messages.size * 1000L)
+            messages.add(
+                ChatMessage(
+                    role = role,
+                    content = content.toString().trim(),
+                    timestamp = resolvedTimestamp,
+                    modelName = modelName
+                )
+            )
             content.clear()
+        }
+    }
+
+    private fun serializeTimestamp(timestamp: Long): String {
+        return "$MESSAGE_TIMESTAMP_PREFIX$timestamp$MESSAGE_TIMESTAMP_SUFFIX"
+    }
+
+    private fun parseMessageTimestamp(line: String): Long? {
+        return line.removePrefix(MESSAGE_TIMESTAMP_PREFIX)
+            .removeSuffix(MESSAGE_TIMESTAMP_SUFFIX)
+            .toLongOrNull()
+    }
+
+    private fun parseFrontmatterTimestamp(raw: String): Long? {
+        return try {
+            frontmatterDateFormat.parse(raw.trim())?.time
+        } catch (_: Exception) {
+            null
         }
     }
 
