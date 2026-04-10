@@ -693,7 +693,7 @@ Format: `[date] [status] [test-id] description`
 | H6 | Pencil icon cannot rename chat session | Not implemented — deferred to feature backlog | Low |
 | ~~F3~~ | ~~Floating button IDLE in other apps~~ | ~~FIXED: show() callback now restores state via updateStateView~~ | ~~Medium~~ |
 | ~~F6~~ | ~~"..." coexists with tool actions~~ | ~~FIXED: removeTypingIndicator() on first ToolAction~~ | ~~Medium~~ |
-| B2-a | No auto-return after task in other app | Agent completes in YouTube but doesn't navigate back to PokeClaw | Low |
+| B2-a | ~~No auto-return after task in other app~~ | Fixed 2026-04-10: cloud task completion now auto-returns to `ComposeChatActivity`, and recent YouTube search passes restored the same PokeClaw session after finishing in another app | Fixed |
 | M1-a | ~~YouTube search: LLM skips input_text~~ | Fixed 2026-04-10: generic in-app search guard now blocks premature completion on explicit `search [app] for [query]` / `search for [query] on [app]` tasks until the agent actually calls `input_text`, then inspects results before finishing | Fixed |
 | M3-a | ~~Screen reading routed as chat~~ | ~~FIXED: added "check", "screen", "notification", "compose", "find", "read my" to task detection~~ | ~~High~~ |
 | M4-a | ~~Compound tasks truncated by Tier 1~~ | ~~FIXED: PipelineRouter skips Tier 1 for tasks with "and"/"then"/"after"~~ | ~~High~~ |
@@ -793,7 +793,7 @@ Format: `[date] [status] [test-id] description`
 
 | ID | Issue | Root Cause | Priority |
 |----|-------|-----------|----------|
-| Q5-1 | LiteRT "Can not find OpenCL" crash in sendChat() | sendChat() uses LiteRT directly without GPU→CPU fallback (LocalLlmClient has fallback, but sendChat doesn't use it) | High |
+| Q5-1 | ~~LiteRT "Can not find OpenCL" crash in sendChat()~~ | Fixed 2026-04-09: `sendChat()` now mirrors the Local client fallback path, resets the engine after OpenCL/native errors, and retries on CPU instead of failing the chat send | Fixed |
 | Q5-2 | ~~API key was "test"~~ | ~~Device had dummy key, reconfigured~~ | ~~Config~~ |
 | K2-a | ~~Accessibility status row shows `Disabled` while Android Accessibility page has `Use PokeClaw` ON~~ | Fixed 2026-04-10: app Settings now reads `enabled_accessibility_services` via `isEnabledInSettings()` | Fixed |
 | K3-b | ~~Accessibility enable flow does not foreground PokeClaw after system toggle ON~~ | Fixed 2026-04-10: pending return only arms for a real disabled→enabled flow, then unwinds Settings and foregrounds app | Fixed |
