@@ -218,6 +218,78 @@ Key OEM differences:
 
 ---
 
+## Current Coverage Snapshot (2026-04-10)
+
+This checklist is **not** yet a fully rerun 100% green master sheet. The honest current state is:
+
+- **Strongly covered right now**
+  - Local quick-task sweeps
+  - Cloud quick-task sweeps
+  - Settings / model config flows
+  - Accessibility reconnect + permission return flows
+  - Task stop / auto-return / same-session preservation
+  - Explicit in-app search and email-compose guards
+- **Covered, but still environment-sensitive**
+  - WhatsApp send flows
+  - Local contact-specific send/call flows
+  - Cross-app floating-pill stop flows
+- **Still blocked or not fully rerun end-to-end**
+  - incoming-message auto-reply while staying in-app (`L5`, `L5-b`) — needs a second live sender device or equivalent live source
+  - some OEM-specific real-device failures from GitHub issues (`Samsung`, `Xiaomi`, `Dimensity`, low-RAM devices)
+  - full public-release upgrade validation from the next stable-signed public build
+
+If a task is not clearly marked `PASS`, `FIXED`, or `BLOCKED` with a reason, do **not** assume it is truly cleared.
+
+## Release Gate
+
+A build is only genuinely ship-ready when all of the following are true:
+
+- **Product gate**
+  - Chat vs Task routing is correct in Local and Cloud
+  - Local GPU→CPU fallback is truthful and stable
+  - Monitor stays in-app and does not force Home
+  - Auto-return restores the same conversation after tasks
+- **QA gate**
+  - Local quick-task sweep finishes with no product `FAIL`
+  - Cloud quick-task sweep finishes with no product `FAIL`
+  - any `BLOCKED` items are clearly environment-caused, not product regressions
+- **Distribution gate**
+  - upgrade/install path is understood for the target release
+  - release artifact, signing path, and checksums are verified
+- **Architecture gate**
+  - any refactor touched only its declared scope
+  - required regression bundle for that refactor class was rerun
+
+## Refactor Regression Bundles
+
+Do **not** rerun the entire world after every refactor. Rerun the right bundle for the code you touched:
+
+- **Model/config changes**
+  - `H2`, `H2-b`, `H2-c`, `H4`, `H4-b`
+  - `Q4-1`, `Q4-2`, `Q5-1`, `Q5-1b`
+  - `LQ1-LQ13`
+- **Task lifecycle / orchestration changes**
+  - `F1-F6`
+  - `I1-I3`
+  - `L1`, `L3`
+  - `Q7-*`
+  - `S2`, `S3`, `S5`, `S7`, `S8`
+- **Accessibility / permission changes**
+  - `K1-K6`
+  - `J4`
+  - `L5`, `L5-b` when an external sender is available
+- **Cross-app / skill / tool changes**
+  - `B1-B5`
+  - `M7-M21`
+  - relevant quick-task sweeps
+- **Release / installer / updater changes**
+  - `Dbg-u1-Dbg-u3`
+  - `Rel-s1-Rel-s7`
+
+When in doubt, rerun the smaller bundle first, then expand only if something drifted.
+
+---
+
 ## Prerequisites
 - [ ] Accessibility service enabled
 - [ ] Cloud LLM configured (API key set)
