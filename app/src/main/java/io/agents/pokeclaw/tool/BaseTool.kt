@@ -4,6 +4,7 @@
 package io.agents.pokeclaw.tool
 
 import com.blankj.utilcode.util.ScreenUtils
+import io.agents.pokeclaw.service.ClawAccessibilityService
 
 abstract class BaseTool {
 
@@ -128,6 +129,15 @@ abstract class BaseTool {
             is Number -> value.toInt() != 0
             else -> value.toString().toBoolean()
         }
+    }
+
+    /**
+     * Accessibility can briefly disconnect/rebind while Android reshuffles the service.
+     * Tools should tolerate that short gap instead of failing immediately.
+     */
+    @JvmOverloads
+    protected fun requireAccessibilityService(timeoutMs: Long = 12_000L): ClawAccessibilityService? {
+        return ClawAccessibilityService.getConnectedInstance(timeoutMs)
     }
 
     // === Screen bounds helpers ===

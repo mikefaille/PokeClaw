@@ -15,6 +15,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import io.agents.pokeclaw.ClawApplication;
 import io.agents.pokeclaw.utils.XLog;
 import io.agents.pokeclaw.utils.KVUtils;
 import android.view.Display;
@@ -85,6 +86,23 @@ public class ClawAccessibilityService extends AccessibilityService {
             if (instance != null) return true;
         }
         return false;
+    }
+
+    /**
+     * Return the connected service immediately when possible. If Android has the service enabled
+     * but it is momentarily rebinding, wait briefly instead of treating it as a hard failure.
+     */
+    public static ClawAccessibilityService getConnectedInstance(long timeoutMs) {
+        ClawAccessibilityService service = instance;
+        if (service != null) return service;
+
+        Context app = ClawApplication.Companion.getInstance();
+        if (app == null || !isEnabledInSettings(app)) {
+            return null;
+        }
+
+        XLog.w(TAG, "Accessibility service not attached yet, waiting up to " + timeoutMs + "ms for rebind");
+        return awaitRunning(timeoutMs) ? instance : null;
     }
 
     @Override

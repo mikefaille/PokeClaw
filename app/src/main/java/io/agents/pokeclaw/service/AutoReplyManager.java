@@ -204,7 +204,7 @@ public class AutoReplyManager {
         executor.submit(() -> {
             try {
                 // Open the messaging app and navigate to the contact's chat
-                ClawAccessibilityService svc = ClawAccessibilityService.getInstance();
+                ClawAccessibilityService svc = ClawAccessibilityService.getConnectedInstance(12000L);
                 if (svc == null) {
                     XLog.e(TAG, "No accessibility service, cannot open chat");
                     return;
@@ -820,7 +820,7 @@ public class AutoReplyManager {
      *   them: "Bring two bottles of water"
      */
     private String readConversationContext() {
-        ClawAccessibilityService service = ClawAccessibilityService.getInstance();
+        ClawAccessibilityService service = ClawAccessibilityService.getConnectedInstance(12000L);
         if (service == null) return "";
 
         AccessibilityNodeInfo root = service.getRootInActiveWindow();
