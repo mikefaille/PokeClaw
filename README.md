@@ -20,13 +20,13 @@
 
 # PokeClaw (PocketClaw) — On-Device AI Phone Agent
 
-**PokeClaw**, also known as **PocketClaw**, turns an Android phone into an AI-operated device.
+**PokeClaw**, also known as **PocketClaw**, is an open-source Android app for AI phone automation.
 
-It runs Gemma 4 on-device for private phone control, and it also supports optional cloud models when you want stronger reasoning for harder tasks.
+It can run Gemma 4 on-device for local, private phone control, and it also supports optional cloud models when you want stronger reasoning for harder tasks.
 
-As far as I know, PokeClaw / PocketClaw is the first working app built on Gemma 4 that can autonomously control an Android phone.
+The current public build is a local-first prototype for turning an Android phone into an AI-operated device.
 
-In Local mode, the entire loop stays inside your device. No account. No API key. No monthly bill.
+In Local mode, model execution stays inside your device. No account or API key is required for Local mode.
 
 
 
@@ -35,11 +35,11 @@ Everyone else:  Phone → Internet → Cloud API → Internet → Phone
                        💳Credit card needed, API key required. Monthly bill attached.
 
 PokeClaw local: Phone → LLM → Phone
-                       That's it. No internet. No API key. No bill.
+                       Local-first when you want it. Optional cloud when you need it.
 ```
-**AI controls your phone. And it never leaves your phone.**
+**AI can control your phone, with local-first execution and optional cloud help.**
 
-PokeClaw is open-source, ships fast, and already handles real chat, task, and automation flows on Android.
+The current public build is open-source and already handles real chat, task, and automation flows on Android.
 
 Monitor a WhatsApp contact and auto-reply:
 
@@ -124,7 +124,7 @@ These are tasks we have already run end-to-end during on-device QA.
 
 PokeClaw gives a small on-device LLM a set of tools (tap, swipe, type, open app, send message, enable auto-reply, etc.) and lets it decide what to do. The LLM sees a text representation of the current screen, picks an action, sees the result, picks the next action, until the task is done.
 
-Everything runs locally via [LiteRT-LM](https://ai.google.dev/edge/litert/llm/overview) with native tool calling. The model never phones home.
+Local execution runs via [LiteRT-LM](https://ai.google.dev/edge/litert/llm/overview) with native tool calling. In Local mode, the model runs on-device.
 
 ## Tools
 
@@ -201,6 +201,7 @@ This is the current direction for PokeClaw based on real device testing, open is
 
 - **Stabler public releases and upgrades.** The release/signing path is being locked down so future public APKs upgrade cleanly instead of falling back to uninstall/reinstall behavior from the older debug-signed builds.
 - **Lower-RAM local model options.** Right now the built-in local model choices are still too heavy for a lot of mid-range phones. Smaller on-device models are high priority.
+- **More small local models for real device coverage.** 1B–1.5B class models for lower-end phones are on the roadmap so more devices can at least run a usable local agent instead of being locked out by RAM limits.
 - **More reliable local model downloads.** Resume/retry behavior, partial download cleanup, and corrupted-model detection are all being hardened so downloads survive weak connections and screen-off/resume cases better.
 - **Broader device compatibility.** Samsung, Xiaomi, Dimensity, and low-RAM device issues are being used as real-world test cases for GPU→CPU fallback, model loading, accessibility reconnects, and generic UI control.
 - **More generic phone-control skills.** We are continuing to replace brittle, app-specific assumptions with generic tools and reusable skills so tasks survive OEM UI changes better.
@@ -208,6 +209,8 @@ This is the current direction for PokeClaw based on real device testing, open is
 ### In progress
 
 - **Import your own local `.litertlm` models.** User-accessible local model import is on the roadmap so you can bring your own LiteRT model instead of being locked to the built-in download list.
+- **Custom local model sources.** We want PokeClaw to go beyond a fixed built-in catalog and support user-defined model sources, including direct downloads from Hugging Face or other hosted URLs.
+- **Google AI Core / system local AI integration.** We are tracking Android's newer on-device AI stack so PokeClaw can eventually use official system-level local model APIs where they make sense, instead of relying on a single runtime path forever.
 - **More built-in workflows.** More quick-task / skill coverage is planned beyond the first WhatsApp-centric workflows.
 - **Remote control / remote conversation flows.** Controlling a phone from another device is a real request and is on the longer roadmap, but it is not the current top priority compared with local reliability and device coverage.
 
@@ -222,6 +225,8 @@ If you want something added, please open an issue. The roadmap above is intentio
 
 - smaller local models for lower-end phones
 - importing your own local models
+- custom local model sources / hosted downloads
+- Android AI Core / official on-device AI support
 - cleaner upgrade/install paths
 - remote control from another phone
 - broader distribution paths like F-Droid
