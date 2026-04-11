@@ -91,6 +91,18 @@ adb shell "am broadcast -a io.agents.pokeclaw.DEBUG_TASK -p io.agents.pokeclaw \
   --es task 'how much battery left'"
 ```
 
+### Send a Chat via ADB (for bridge smoke)
+
+```bash
+# Launch ComposeChatActivity through the debug receiver and inject a chat message
+adb shell "am broadcast -a io.agents.pokeclaw.TASK -p io.agents.pokeclaw \
+  --es chat 'read my clipboard and explain what it says'"
+```
+
+Use this when you need a fast chatroom-bridge verification but do not trust raw ADB tap coordinates.
+It should create a visible user bubble, wait for the backend reply, and render the assistant bubble in the same conversation.
+On Android 15+, make sure PokeClaw is already in the foreground first; otherwise the system may block the receiver from bringing the chat activity forward for UI-visible verification.
+
 ### Read Results from Logcat
 
 ```bash

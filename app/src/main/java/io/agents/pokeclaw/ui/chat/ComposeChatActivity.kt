@@ -33,6 +33,8 @@ class ComposeChatActivity : ComponentActivity() {
 
     companion object {
         private const val TAG = "ComposeChatActivity"
+        private const val EXTRA_TASK = "task"
+        private const val EXTRA_CHAT = "chat"
     }
 
     private val executor = Executors.newSingleThreadExecutor()
@@ -215,40 +217,13 @@ class ComposeChatActivity : ComponentActivity() {
 
         // Debug: auto-trigger task from ADB intent
         // Usage: adb shell am start -n io.agents.pokeclaw/.ui.chat.ComposeChatActivity --es task "open my camera"
-        intent?.getStringExtra("task")?.let { taskText ->
-            XLog.i(TAG, "Auto-task from intent: $taskText")
-            // Wait for model to load, then send task
-            val handler = Handler(Looper.getMainLooper())
-            handler.postDelayed(object : Runnable {
-                override fun run() {
-                    if (chatSessionController.isModelReady()) {
-                        taskFlowController.sendTask(taskText)
-                    } else {
-                        handler.postDelayed(this, 1000)
-                    }
-                }
-            }, 2000)
-        }
+        handleIntentAutomation(intent, initialDelayMs = 2000)
 
     }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        // Handle task from broadcast receiver (SINGLE_TOP re-delivery)
-        intent.getStringExtra("task")?.let { taskText ->
-            XLog.i(TAG, "Task from onNewIntent: $taskText")
-            if (chatSessionController.isModelReady()) {
-                taskFlowController.sendTask(taskText)
-            } else {
-                val handler = Handler(Looper.getMainLooper())
-                handler.postDelayed(object : Runnable {
-                    override fun run() {
-                        if (chatSessionController.isModelReady()) taskFlowController.sendTask(taskText)
-                        else handler.postDelayed(this, 1000)
-                    }
-                }, 1000)
-            }
-        }
+        handleIntentAutomation(intent, initialDelayMs = 1000)
     }
 
     override fun onResume() {
@@ -282,6 +257,33 @@ class ComposeChatActivity : ComponentActivity() {
 
     private fun sendChat(text: String) {
         chatSessionController.sendChat(text)
+    }
+
+    private fun handleIntentAutomation(intent: Intent?, initialDelayMs: Long) {
+        val taskText = intent?.getStringExtra(EXTRA_TASK)?.takeIf { it.isNotBlank() }
+        val chatText = intent?.getStringExtra(EXTRA_CHAT)?.takeIf { it.isNotBlank() }
+        val automationText = taskText ?: chatText ?: return
+        val isTask = taskText != null
+
+        XLog.i(
+            TAG,
+            if (isTask) "Auto-task from intent: $automationText" else "Auto-chat from intent: $automationText"
+        )
+
+        val handler = Handler(Looper.getMainLooper())
+        handler.postDelayed(object : Runnable {
+            override fun run() {
+                if (chatSessionController.isModelReady()) {
+                    if (isTask) {
+                        taskFlowController.sendTask(automationText)
+                    } else {
+                        sendChat(automationText)
+                    }
+                } else {
+                    handler.postDelayed(this, 1000)
+                }
+            }
+        }, initialDelayMs)
     }
 
     private fun syncTaskAgentConfig() {

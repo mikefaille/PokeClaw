@@ -15,8 +15,9 @@ import io.agents.pokeclaw.utils.XLog;
  *
  * Usage:
  *   adb shell am broadcast -a io.agents.pokeclaw.TASK --es task "send hi to Mom on WhatsApp" -p io.agents.pokeclaw
+ *   adb shell am broadcast -a io.agents.pokeclaw.TASK --es chat "read my clipboard and explain what it says" -p io.agents.pokeclaw
  *
- * Launches ComposeChatActivity with the task extra — works even after reinstall.
+ * Launches ComposeChatActivity with the matching extra — works even after reinstall.
  */
 public class TaskTriggerReceiver extends BroadcastReceiver {
 
@@ -28,14 +29,17 @@ public class TaskTriggerReceiver extends BroadcastReceiver {
         if (!io.agents.pokeclaw.BuildConfig.DEBUG) return;
         if (intent == null || !ACTION.equals(intent.getAction())) return;
         String task = intent.getStringExtra("task");
-        if (task == null || task.isEmpty()) {
+        String chat = intent.getStringExtra("chat");
+        boolean hasTask = task != null && !task.isEmpty();
+        boolean hasChat = chat != null && !chat.isEmpty();
+        if (!hasTask && !hasChat) {
             XLog.w(TAG, "Received broadcast with no task extra");
             return;
         }
-        XLog.i(TAG, "Received task via broadcast: " + task);
+        XLog.i(TAG, hasTask ? "Received task via broadcast: " + task : "Received chat via broadcast: " + chat);
 
         // Auto-reply commands: "autoreply on Mom" / "autoreply off"
-        if (task.startsWith("autoreply ")) {
+        if (hasTask && task.startsWith("autoreply ")) {
             String cmd = task.substring(10).trim();
             if (cmd.equals("off")) {
                 io.agents.pokeclaw.service.AutoReplyManager.getInstance().stopAll();
@@ -56,9 +60,14 @@ public class TaskTriggerReceiver extends BroadcastReceiver {
             }
         }
 
-        // Launch ComposeChatActivity with task extra — this always works
+        // Launch ComposeChatActivity with task/chat extra — this always works
         Intent launch = new Intent(context, ComposeChatActivity.class);
-        launch.putExtra("task", task);
+        if (hasTask) {
+            launch.putExtra("task", task);
+        }
+        if (hasChat) {
+            launch.putExtra("chat", chat);
+        }
         launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP);
         context.startActivity(launch);
     }
