@@ -652,9 +652,11 @@ Layer 1 broadcast bypasses UI routing. Only Layer 3 catches routing bugs.
 ### Q2. Cloud Tab Send Routing
 - [ ] **Q2-1. Cloud chat**: Cloud tab → type "hello" → tap send → AI response in chat bubble (routed via onSendTask)
 - [ ] **Q2-1b. Cloud chat stays out of task-running state**: Cloud tab → type a normal chat message like `hello` → reply appears in chat, but the orange `Task running...` bar never appears unless the backend actually enters task/tool execution
+- [ ] **Q2-1c. Cloud plain chat imperative does not misroute to Send Message**: Cloud tab → type `say hi` or `tell me more` → stays in ordinary chat, does NOT launch a send-message task, and does NOT reuse any old contact/app state
 - [ ] **Q2-2. Cloud task**: Cloud tab → type "how much battery left" → tap send → actual battery info returned
 - [ ] **Q2-3. Cloud no toggle**: Cloud tab → verify NO Chat/Task toggle visible → all input goes to unified pipeline
 - [ ] **Q2-4. Cloud direct-data bridge**: Cloud tab → type `read my clipboard and explain what it says` → backend uses the clipboard tool AND the explanation appears as a visible assistant bubble in the same chatroom
+- [ ] **Q2-4b. Empty clipboard is not a task failure**: Cloud tab → clipboard currently empty → type `read my clipboard and explain what it says` → answer honestly says clipboard is empty, but the chatroom must NOT insert a misleading `Clipboard failed` status line
 - [ ] **Q2-5. Cloud notifications bridge**: Cloud tab → type `read my notifications and summarize` → backend uses notifications tool AND the summary appears as a visible assistant bubble in the same chatroom
 - [ ] **Q2-6. Cloud-only capability proof**: in the same conversation, switch to Cloud and ask a task known to exceed Local reliability (for example `copy the latest email subject and Google it` or `open Reddit and search for pokeclaw`) → task completes successfully and the reply bubble is tagged with the Cloud model
 - [ ] **Q2-7. Cloud context handoff proof**: in the same conversation, ask Cloud to summarize something, then say `send that summary by email` → Cloud uses the earlier chat context and the resulting reply/task output stays tagged as Cloud
@@ -1057,9 +1059,11 @@ Format: `[date] [status] [test-id] description`
 [2026-04-11] [PASS]    DD7-unit  Conceptual control `what is an Android clipboard` remains a normal chat-style case in unit coverage; the guard no longer falsely forces a clipboard tool just because the word `clipboard` appears
 [2026-04-11] [FIXED]   Q2-r1  Cloud unified-input send no longer reuses task-running chrome for ordinary chat turns; chat waiting state and true task execution state are tracked separately
 [2026-04-11] [PASS]    Q2-1b/Q6-3/T10  Pixel 8 Pro smoke after switching to `gpt-4.1-mini`: top pill shows `● gpt-4.1-mini · Cloud`, Cloud tab remains selected, placeholder stays `Chat or give a task...`, and no orange `Task running...` bar appears for the chat shell
+[2026-04-11] [PASS]    Q2-1c  Fresh Cloud chat smoke on Pixel 8 Pro: typing `say hi` stayed in ordinary chat, produced a normal `Hello! How can I assist you today?` assistant bubble tagged `gpt-4o-2024-08-06`, and did not launch `Send Message` or reuse any old contact state
 [2026-04-11] [PASS]    Q1-6/Q6-3/T10  Settings round-trip truth smoke: switch to Cloud, open Settings, press Back, and return to the same conversation → logcat reports `Cloud chat ready: gpt-4.1-mini`, top pill still shows `● gpt-4.1-mini · Cloud`, and the chat shell stays on the Cloud placeholder instead of drifting back to Local
 [2026-04-11] [PASS]    H4-d/H4-e/T2/T10  Models page truth smoke on Pixel 8 Pro: page now shows `Active model`, `Default local model`, and `Default cloud model` separately; the linked default Gemma built-in row no longer claims `Not downloaded`
 [2026-04-11] [PASS]    H4-c  Cloud dropdown switch smoke after install: switching to `GPT-4o` leaves a single `Switched to GPT-4o` system line instead of a lower-case + display-name duplicate pair
+[2026-04-11] [ISSUE]   Q2-4b-r1  Cloud clipboard bridge still shows a misleading `Clipboard failed` status line when the clipboard is empty. The backend does call `clipboard(action="get")` and the final assistant answer is correct, but the intermediate task-status chrome still lies about failure. Keep this as a regression guard until the task-event layer treats empty direct-device results as success.
 ```
 
 ### Bugs Found During v9 QA

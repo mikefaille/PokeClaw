@@ -86,7 +86,7 @@ public class ClipboardTool extends BaseTool {
             if (ClipboardReaderActivity.clipboardError != null) {
                 return ToolResult.error(ClipboardReaderActivity.clipboardError);
             }
-            return ToolResult.error("Clipboard is empty");
+            return ToolResult.success("Clipboard is empty");
         } catch (Exception e) {
             return ToolResult.error("Failed to read clipboard: " + e.getMessage());
         }

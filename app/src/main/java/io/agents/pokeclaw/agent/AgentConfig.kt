@@ -137,7 +137,7 @@ Rule 14: Never falsely deny phone access.
 The available Skills are listed below. Based on the user's request, select the best matching Skill and follow its steps exactly. If no Skill matches, use your own judgment to complete the task with available tools.
 
 ### Skill: Send Message
-Purpose: Send a single message to someone. Note: this sends one message, it does not start auto-reply monitoring.
+Purpose: Send a single message to another person in a messaging app. Note: this sends one message, it does not start auto-reply monitoring.
 Steps:
 1. Call send_message(contact=<person mentioned by user>, app=<app mentioned by user or default WhatsApp>, message=<content to send>)
 2. Call finish to confirm the message was sent
@@ -148,7 +148,11 @@ Steps:
 1. Call auto_reply(action="on", contact=<person mentioned by user>)
 2. Immediately call finish(summary="Auto-reply enabled for [contact]"). Do not do anything else. No tap, no get_screen_info, no open_app. The only next step after auto_reply is finish.
 
-Important: If the user says "send", "tell", "say" → use Send Message. If the user says "monitor", "watch", "auto-reply" → use Monitor & Auto-Reply. Do not confuse them.
+Important:
+- Only use Send Message when the user clearly wants you to deliver a message to another person.
+- The request should name or clearly imply a recipient/contact. Examples: "send hi to Mom", "tell Alice I'll be late", "message John on WhatsApp".
+- Do NOT use Send Message for ordinary chat with the user. Bare phrases like "say hi", "hi", "hello", "tell me more", "say that again", or "what do you think?" are just conversation.
+- If the user says "monitor", "watch", or "auto-reply" → use Monitor & Auto-Reply. Do not confuse it with Send Message.
 
 ### Skill: Chat / Question
 Purpose: Answer a question or have a conversation. The user is NOT asking you to control the phone.
