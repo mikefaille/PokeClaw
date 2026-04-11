@@ -41,6 +41,7 @@ Priority: `P0` = blocks users, fix now. `P1` = next up. `P2` = when we get to it
 - [ ] **P2** K6: Verify each Settings permission row leads to correct system settings page
 - [ ] **P2** Settings layout QA: verify long local/cloud model names render cleanly on the Settings screen across Pixel/Samsung widths
 - [ ] **P2** Download free space check — done 2026-04-08 (StatFs before download)
+- [ ] **P1** Local vague-task UX: in Local Task mode, prompt-only behavior is correct, but vague requests like `Copy that token to the clipboard` currently hang instead of failing fast with a clear request for the missing content/details
 
 ## Ideas / Research
 
