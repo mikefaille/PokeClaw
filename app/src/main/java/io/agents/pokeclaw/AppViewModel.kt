@@ -99,8 +99,8 @@ class AppViewModel : ViewModel() {
 
     fun afterInit() {
         acquireScreenWakeLock()
-        ForegroundService.start(ClawApplication.instance)
-        KeepAliveJobService.schedule(ClawApplication.instance)
+        KeepAliveJobService.cancel(ClawApplication.instance)
+        ForegroundService.syncToBackgroundState(ClawApplication.instance)
         ConfigServerManager.autoStartIfNeeded(ClawApplication.instance)
         if (android.provider.Settings.canDrawOverlays(ClawApplication.instance)) {
             android.os.Handler(android.os.Looper.getMainLooper()).post {

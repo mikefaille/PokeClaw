@@ -15,14 +15,17 @@ class TaskPromptEnvelopeTest {
                 "Assistant: Here is the summary of the meeting.",
             ),
             currentRequest = "Send that summary by email",
+            backgroundState = "Background monitor active for: Mom on Telegram.",
         )
 
         val parsed = TaskPromptEnvelope.parse(prompt)
 
         assertTrue(parsed.hasChatHistory)
+        assertTrue(parsed.hasBackgroundState)
         assertEquals("Send that summary by email", parsed.currentRequest)
         assertTrue(parsed.chatHistory!!.contains("Please summarize the meeting notes."))
         assertTrue(parsed.chatHistory!!.contains("Here is the summary of the meeting."))
+        assertEquals("Background monitor active for: Mom on Telegram.", parsed.backgroundState)
     }
 
     @Test

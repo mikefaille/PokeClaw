@@ -6,7 +6,6 @@ package io.agents.pokeclaw
 import io.agents.pokeclaw.agent.DefaultAgentService
 import io.agents.pokeclaw.base.BaseApp
 import io.agents.pokeclaw.channel.ChannelManager
-import io.agents.pokeclaw.service.ForegroundService
 import io.agents.pokeclaw.tool.ToolRegistry
 import io.agents.pokeclaw.utils.KVUtils
 import io.agents.pokeclaw.utils.XLog
@@ -44,13 +43,6 @@ class ClawApplication : BaseApp() {
 
         // Lightweight initialization (main thread)
         appViewModelInstance.initCommon()
-        if (!ForegroundService.isRunning()) {
-            val started = ForegroundService.start(this)
-            if (!started) {
-                XLog.e(TAG, "ForegroundService start failed: notification permission not granted")
-            }
-        }
-
         Thread({
             try {
                 android.util.Log.e("POKECLAW_INIT", "app-async-init thread STARTED")

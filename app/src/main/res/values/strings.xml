@@ -25,8 +25,8 @@
     <string name="guide_start">Get Started</string>
     <string name="guide_title_accessibility">Accessibility Service</string>
     <string name="guide_desc_accessibility">Lets PokeClaw read the screen and tap buttons for you. Tap to enable.</string>
-    <string name="guide_title_notification">Persistent Notification</string>
-    <string name="guide_desc_notification">Keeps PokeClaw running in the background. Tap to enable.</string>
+    <string name="guide_title_notification">Task Notifications</string>
+    <string name="guide_desc_notification">Lets PokeClaw show progress while a task or monitor is active. Tap to enable.</string>
     <string name="guide_title_overlay">System Overlay</string>
     <string name="guide_desc_overlay">Shows a floating status panel while tasks run. Tap to enable.</string>
     <string name="guide_title_battery">Battery Whitelist</string>
@@ -38,14 +38,14 @@
     <string name="home_need_notification_permission">Notification permission is required</string>
     <string name="home_enable_accessibility">Please enable PokeClaw Accessibility Service</string>
     <string name="home_accessibility_enabled">Accessibility service enabled</string>
-    <string name="home_notification_enabled">Persistent notification enabled</string>
+    <string name="home_notification_enabled">Task notifications enabled</string>
     <string name="home_overlay_enabled">Overlay permission enabled</string>
     <string name="home_battery_ignored">Battery optimization ignored</string>
     <string name="home_permission_enabled">Enabled</string>
     <string name="home_card_accessibility_title">Accessibility Service</string>
     <string name="home_card_accessibility_subtitle">For automated phone control</string>
-    <string name="home_card_notification_title">Persistent Notification</string>
-    <string name="home_card_notification_subtitle">Show running status</string>
+    <string name="home_card_notification_title">Task Notifications</string>
+    <string name="home_card_notification_subtitle">Only while tasks or monitoring are active</string>
     <string name="home_card_system_window_title">System Window</string>
     <string name="home_card_system_window_subtitle">Floating panel overlay</string>
     <string name="home_card_battery_title">Battery Whitelist</string>
@@ -126,8 +126,8 @@
     <!-- Foreground Service Notification -->
     <string name="notification_channel_name">PokeClaw Status</string>
     <string name="notification_channel_description">Shows PokeClaw running status and stats</string>
-    <string name="notification_content_title">PokeClaw Running</string>
-    <string name="notification_content_text">AI Agent service is active</string>
+    <string name="notification_content_title">PokeClaw · Task in progress</string>
+    <string name="notification_content_text">Running task...</string>
 
     <!-- Channel Messages -->
     <string name="channel_msg_task_cancelled">Task cancelled manually</string>

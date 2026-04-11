@@ -3,7 +3,9 @@
 
 package io.agents.pokeclaw.tool.impl;
 
+import io.agents.pokeclaw.ClawApplication;
 import io.agents.pokeclaw.service.AutoReplyManager;
+import io.agents.pokeclaw.service.ForegroundService;
 import io.agents.pokeclaw.tool.BaseTool;
 import io.agents.pokeclaw.tool.ToolParameter;
 import io.agents.pokeclaw.tool.ToolResult;
@@ -62,6 +64,7 @@ public class AutoReplyTool extends BaseTool {
 
         if (action.equals("off") || action.equals("disable") || action.equals("stop")) {
             manager.setEnabled(false);
+            ForegroundService.Companion.resetToIdle(ClawApplication.Companion.getInstance());
             return ToolResult.success("Auto-reply disabled.");
         }
 
@@ -77,6 +80,7 @@ public class AutoReplyTool extends BaseTool {
             }
             manager.addTarget(contact, app);
             manager.setEnabled(true);
+            ForegroundService.Companion.showMonitorStatus(ClawApplication.Companion.getInstance());
             return ToolResult.success("Auto-reply enabled for " + contact + " on " + app +
                     ". Monitoring incoming messages and will reply automatically.");
         }

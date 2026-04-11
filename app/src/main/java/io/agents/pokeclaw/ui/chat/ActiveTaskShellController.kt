@@ -5,8 +5,10 @@ package io.agents.pokeclaw.ui.chat
 
 import android.os.Handler
 import android.os.Looper
+import io.agents.pokeclaw.ClawApplication
 import io.agents.pokeclaw.AppViewModel
 import io.agents.pokeclaw.service.AutoReplyManager
+import io.agents.pokeclaw.service.ForegroundService
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -49,6 +51,7 @@ class ActiveTaskShellController(
             autoReplyManager.isEnabled = false
         }
         refreshActiveTasks()
+        ForegroundService.resetToIdle(ClawApplication.instance)
         return "Stopped monitoring $contact"
     }
 
@@ -66,6 +69,7 @@ class ActiveTaskShellController(
         }
 
         refreshActiveTasks()
+        ForegroundService.resetToIdle(ClawApplication.instance)
         return when {
             requestedTaskStop -> "Stopping current task..."
             stoppedMonitoring -> "All tasks stopped"

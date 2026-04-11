@@ -25,8 +25,8 @@
     <string name="guide_start">はじめる</string>
     <string name="guide_title_accessibility">ユーザー補助サービス</string>
     <string name="guide_desc_accessibility">AIがデバイスを操作するための基本権限です。\n\n1. 設定 → ユーザー補助 → ダウンロード済みアプリを開く\n2. リストから「PokeClaw」を見つける\n3. スイッチをオンにする\n4. システムダイアログで確認する</string>
-    <string name="guide_title_notification">常駐通知</string>
-    <string name="guide_desc_notification">アプリをバックグラウンドで実行し続け、システムによる強制終了を防ぎます。\n\nホーム画面のカードをタップして有効にしてください。Android 13以降は通知権限が先に求められます。</string>
+    <string name="guide_title_notification">タスク通知</string>
+    <string name="guide_desc_notification">タスクや監視が動作中のときだけ進行状況を表示します。\n\nホーム画面のカードをタップして有効にしてください。Android 13以降は通知権限が先に求められます。</string>
     <string name="guide_title_overlay">システムオーバーレイ</string>
     <string name="guide_desc_overlay">AI実行状態を表示するフローティングパネルです。\n\n1. 設定 → アプリ → PokeClawを開く\n2.「他のアプリの上に重ねて表示」を見つける\n3. スイッチをオンにする</string>
     <string name="guide_title_battery">バッテリーホワイトリスト</string>
@@ -38,13 +38,13 @@
     <string name="home_need_notification_permission">通知権限が必要です</string>
     <string name="home_enable_accessibility">PokeClawユーザー補助サービスを有効にしてください</string>
     <string name="home_accessibility_enabled">ユーザー補助サービスが有効です</string>
-    <string name="home_notification_enabled">常駐通知が有効です</string>
+    <string name="home_notification_enabled">タスク通知が有効です</string>
     <string name="home_overlay_enabled">オーバーレイ権限が有効です</string>
     <string name="home_battery_ignored">バッテリー最適化を無効化済み</string>
     <string name="home_permission_enabled">有効</string>
     <string name="home_card_accessibility_title">ユーザー補助サービス</string>
     <string name="home_card_accessibility_subtitle">スマホの自動操作に使用</string>
-    <string name="home_card_notification_title">常駐通知</string>
+    <string name="home_card_notification_title">タスク通知</string>
     <string name="home_card_notification_subtitle">実行状態を表示</string>
     <string name="home_card_system_window_title">システムウィンドウ</string>
     <string name="home_card_system_window_subtitle">フローティングパネルを表示</string>
@@ -126,8 +126,8 @@
     <!-- フォアグラウンドサービス通知 -->
     <string name="notification_channel_name">PokeClaw ステータス</string>
     <string name="notification_channel_description">PokeClawの実行状態と統計を表示</string>
-    <string name="notification_content_title">PokeClaw 実行中</string>
-    <string name="notification_content_text">AI Agentサービスが稼働中</string>
+    <string name="notification_content_title">PokeClaw · タスク実行中</string>
+    <string name="notification_content_text">タスクを実行しています...</string>
 
     <!-- チャネルメッセージ -->
     <string name="channel_msg_task_cancelled">タスクを手動でキャンセルしました</string>

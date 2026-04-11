@@ -25,8 +25,8 @@
     <string name="guide_start">开始使用</string>
     <string name="guide_title_accessibility">无障碍服务</string>
     <string name="guide_desc_accessibility">这是 AI 自动操控设备的核心权限。\n\n1. 前往系统设置 → 无障碍 → 已下载的应用\n2. 在列表中找到「PokeClaw」\n3. 开启开关\n4. 在系统弹窗中确认</string>
-    <string name="guide_title_notification">常驻通知</string>
-    <string name="guide_desc_notification">保持应用在后台运行，防止被系统杀死。\n\n在首页点击对应卡片即可开启。Android 13 及以上会先请求通知权限。</string>
+    <string name="guide_title_notification">任务通知</string>
+    <string name="guide_desc_notification">只在任务执行或监控开启时显示进度通知。\n\n在首页点击对应卡片即可开启。Android 13 及以上会先请求通知权限。</string>
     <string name="guide_title_overlay">悬浮窗</string>
     <string name="guide_desc_overlay">显示 AI 执行状态的浮动面板。\n\n1. 前往系统设置 → 应用 → PokeClaw\n2. 找到「显示在其他应用上方」\n3. 开启开关</string>
     <string name="guide_title_battery">电池白名单</string>
@@ -38,13 +38,13 @@
     <string name="home_need_notification_permission">需要通知权限才能显示常驻通知</string>
     <string name="home_enable_accessibility">请开启 PokeClaw 无障碍服务</string>
     <string name="home_accessibility_enabled">已开启无障碍服务</string>
-    <string name="home_notification_enabled">已开启常驻通知</string>
+    <string name="home_notification_enabled">已开启任务通知</string>
     <string name="home_overlay_enabled">已开启悬浮窗权限</string>
     <string name="home_battery_ignored">已忽略电池优化</string>
     <string name="home_permission_enabled">已开启</string>
     <string name="home_card_accessibility_title">无障碍服务</string>
     <string name="home_card_accessibility_subtitle">用于自动化操作手机</string>
-    <string name="home_card_notification_title">常驻通知</string>
+    <string name="home_card_notification_title">任务通知</string>
     <string name="home_card_notification_subtitle">显示运行状态</string>
     <string name="home_card_system_window_title">系统窗口</string>
     <string name="home_card_system_window_subtitle">悬浮窗显示操作面板</string>
@@ -126,8 +126,8 @@
     <!-- 前台服务通知 -->
     <string name="notification_channel_name">PokeClaw 运行状态</string>
     <string name="notification_channel_description">显示 PokeClaw 运行状态及统计数据</string>
-    <string name="notification_content_title">PokeClaw 运行中</string>
-    <string name="notification_content_text">AI Agent 服务正在运行</string>
+    <string name="notification_content_title">PokeClaw · 正在执行任务</string>
+    <string name="notification_content_text">任务执行中...</string>
 
     <!-- 通道消息（发给用户的回复） -->
     <string name="channel_msg_task_cancelled">任务已手动取消</string>

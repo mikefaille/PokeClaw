@@ -11,6 +11,7 @@ import android.view.accessibility.AccessibilityNodeInfo;
 import io.agents.pokeclaw.tool.ToolRegistry;
 import io.agents.pokeclaw.tool.ToolResult;
 import io.agents.pokeclaw.tool.impl.SendMessageTool;
+import io.agents.pokeclaw.ClawApplication;
 import io.agents.pokeclaw.utils.XLog;
 
 import java.util.ArrayList;
@@ -165,6 +166,7 @@ public class AutoReplyManager {
         this.enabled = enabled;
         XLog.i(TAG, "Auto-reply " + (enabled ? "ENABLED" : "DISABLED") +
                 " for contacts: " + getMonitoredContacts());
+        syncForegroundNotification();
     }
 
     public boolean isEnabled() { return enabled; }
@@ -185,6 +187,7 @@ public class AutoReplyManager {
         enabled = false;
         monitoredTargets.clear();
         XLog.i(TAG, "Auto-reply stopped and all contacts cleared");
+        syncForegroundNotification();
     }
 
     public void addContact(String name) {
@@ -199,6 +202,7 @@ public class AutoReplyManager {
         }
         monitoredTargets.put(target.getKey(), target);
         XLog.i(TAG, "Added monitor target: " + target.getDisplayLabel());
+        syncForegroundNotification();
     }
 
     public void removeContact(String name) {
@@ -214,10 +218,24 @@ public class AutoReplyManager {
         for (String key : toRemove) {
             monitoredTargets.remove(key);
         }
+        syncForegroundNotification();
     }
 
     public void clearContacts() {
         monitoredTargets.clear();
+        syncForegroundNotification();
+    }
+
+    private void syncForegroundNotification() {
+        try {
+            if (enabled && !monitoredTargets.isEmpty()) {
+                ForegroundService.Companion.showMonitorStatus(ClawApplication.Companion.getInstance());
+            } else {
+                ForegroundService.Companion.resetToIdle(ClawApplication.Companion.getInstance());
+            }
+        } catch (Exception e) {
+            XLog.w(TAG, "Failed to sync foreground notification", e);
+        }
     }
 
     /**

@@ -22,6 +22,12 @@ class KeepAliveJobService : JobService() {
         private const val JOB_ID = 10086
         private const val INTERVAL_MS = 15 * 60 * 1000L // 15 minutes
 
+        fun cancel(context: Context) {
+            val scheduler = context.getSystemService(Context.JOB_SCHEDULER_SERVICE) as JobScheduler
+            scheduler.cancel(JOB_ID)
+            XLog.i(TAG, "KeepAlive job cancelled")
+        }
+
         fun schedule(context: Context) {
             val scheduler = context.getSystemService(Context.JOB_SCHEDULER_SERVICE) as JobScheduler
             if (scheduler.getPendingJob(JOB_ID) != null) return
@@ -42,10 +48,7 @@ class KeepAliveJobService : JobService() {
 
     override fun onStartJob(params: JobParameters?): Boolean {
         XLog.i(TAG, "KeepAlive job triggered, ForegroundService running: ${ForegroundService.isRunning()}")
-        if (!ForegroundService.isRunning()) {
-            val started = ForegroundService.start(applicationContext)
-            XLog.i(TAG, "Restarted ForegroundService: $started")
-        }
+        ForegroundService.syncToBackgroundState(applicationContext)
         return false
     }
 

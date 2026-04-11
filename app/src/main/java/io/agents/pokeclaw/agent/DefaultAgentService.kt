@@ -467,12 +467,20 @@ class DefaultAgentService : AgentService {
         val messages = mutableListOf<ChatMessage>()
         messages.add(SystemMessage.from(fullSystemPrompt))
 
-        val promptForModel = if (parsedPrompt.hasChatHistory) {
+        val promptForModel = if (parsedPrompt.hasChatHistory || parsedPrompt.hasBackgroundState) {
             buildString {
-                append("You are continuing an existing chatroom. Use the conversation below as context when the current request refers to earlier messages.\n\n")
-                append("Chatroom so far:\n")
-                append(parsedPrompt.chatHistory!!.trim())
-                append("\n\nCurrent user request:\n")
+                append("You are continuing an existing chatroom. Use the provided context when the current request refers to earlier messages or asks about current background activity.\n\n")
+                parsedPrompt.backgroundState?.trim()?.takeIf { it.isNotEmpty() }?.let { state ->
+                    append("Current background status:\n")
+                    append(state)
+                    append("\n\n")
+                }
+                parsedPrompt.chatHistory?.trim()?.takeIf { it.isNotEmpty() }?.let { history ->
+                    append("Chatroom so far:\n")
+                    append(history)
+                    append("\n\n")
+                }
+                append("Current user request:\n")
                 append(rawUserRequest)
             }
         } else {

@@ -110,7 +110,7 @@ class SettingsActivity : BaseActivity() {
     private fun refreshPermissions() {
         val capabilities = AppCapabilityCoordinator.snapshot(this)
         permAccessibility?.setTrailingText(capabilities.accessibilityStatusLabel)
-        permNotification?.setTrailingText(if (capabilities.foregroundServiceRunning) "Enabled" else "Disabled")
+        permNotification?.setTrailingText(capabilities.notificationPermissionStatusLabel)
         permNotifAccess?.setTrailingText(capabilities.notificationAccessStatusLabel)
         permOverlay?.setTrailingText(if (capabilities.overlayGranted) "Enabled" else "Disabled")
         permBattery?.setTrailingText(if (capabilities.batteryOptimizationIgnored) "Unrestricted" else "Restricted")
@@ -173,9 +173,8 @@ class SettingsActivity : BaseActivity() {
             leadingIcon = R.drawable.ic_notification,
             title = getString(R.string.home_card_notification_title),
             onClick = {
-                if (!ForegroundService.isRunning()) {
-                    val started = ForegroundService.start(this@SettingsActivity)
-                    if (!started && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                if (!AppCapabilityCoordinator.isNotificationPermissionGranted(this@SettingsActivity)) {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                         requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 100)
                     }
                 } else {
@@ -184,7 +183,9 @@ class SettingsActivity : BaseActivity() {
             },
             showDivider = true
         ).apply {
-            setTrailingText(if (ForegroundService.isRunning()) "Enabled" else "Disabled")
+            setTrailingText(
+                if (AppCapabilityCoordinator.isNotificationPermissionGranted(this@SettingsActivity)) "Enabled" else "Disabled"
+            )
         }
 
         permNotifAccess = permissionsGroup.addMenuItem(

@@ -63,6 +63,9 @@ data class AppCapabilitySnapshot(
             ServiceBindingState.CONNECTING -> "Connecting"
             ServiceBindingState.DISABLED -> "Disabled"
         }
+
+    val notificationPermissionStatusLabel: String
+        get() = if (notificationPermissionGranted) "Enabled" else "Disabled"
 }
 
 object AppCapabilityCoordinator {

@@ -124,6 +124,8 @@ class TaskOrchestrator(
             }
         }
 
+        ForegroundService.updateTaskStatus(ClawApplication.instance, "Running task...")
+
         // Tier 1: Deterministic routing
         val route = pipelineRouter.route(task)
         when (route) {
@@ -133,6 +135,7 @@ class TaskOrchestrator(
                 taskEventCallback?.invoke(TaskEvent.Completed(route.description))
                 ChannelManager.sendMessage(channel, "✓ ${route.description}", messageID)
                 releaseTask()
+                ForegroundService.resetToIdle(ClawApplication.instance)
                 FloatingCircleManager.setSuccessState()
                 onTaskFinished()
                 return
@@ -149,6 +152,7 @@ class TaskOrchestrator(
                     ChannelManager.sendMessage(channel, "✓ ${route.description}", messageID)
                 }
                 releaseTask()
+                ForegroundService.resetToIdle(ClawApplication.instance)
                 FloatingCircleManager.setSuccessState()
                 onTaskFinished()
                 return
@@ -200,6 +204,7 @@ class TaskOrchestrator(
             } catch (e: Exception) {
                 XLog.e(TAG, "Failed to initialize AgentService", e)
                 releaseTask()
+                ForegroundService.resetToIdle(ClawApplication.instance)
                 taskEventCallback?.invoke(TaskEvent.Failed("AI service not ready"))
                 ChannelManager.sendMessage(channel, ClawApplication.instance.getString(R.string.channel_msg_service_not_ready), messageID)
                 return

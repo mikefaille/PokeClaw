@@ -1387,7 +1387,9 @@ private fun QuickTasksPanel(
                 // Monitor card
                 val monitorBorderColor = if (monitorActive) colors.accent else colors.inputBorder
                 Surface(
-                    onClick = onMonitorClick,
+                    onClick = {
+                        if (!monitorActive) onMonitorClick()
+                    },
                     shape = RoundedCornerShape(10.dp),
                     color = colors.background,
                     border = androidx.compose.foundation.BorderStroke(
@@ -1419,12 +1421,14 @@ private fun QuickTasksPanel(
                                 color = colors.textPrimary,
                             )
                             Text(
-                                if (monitorActive) "Monitoring active" else "Watch messages and reply automatically",
+                                if (monitorActive) "Monitoring active — use the top bar to stop" else "Watch messages and reply automatically",
                                 fontSize = 9.sp,
                                 color = colors.textTertiary,
                             )
                         }
-                        Text("›", color = colors.textTertiary, fontSize = 14.sp)
+                        if (!monitorActive) {
+                            Text("›", color = colors.textTertiary, fontSize = 14.sp)
+                        }
                     }
                 }
                 Spacer(Modifier.height(6.dp))

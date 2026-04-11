@@ -51,12 +51,12 @@ class TaskFlowController(
     }
 
     private var sendTaskRetryCount = 0
+    private var lastMonitorStatusNote: String? = null
 
     fun sendTask(text: String) {
-        val lower = text.lowercase()
-        if (lower.contains("monitor") || lower.contains("auto-reply") || lower.contains("auto reply") || lower.contains("autoreply")
-            || lower.contains("watch") && (lower.contains("message") || lower.contains("reply"))) {
-            handleMonitorTask(text)
+        if (ModelConfigRepository.snapshot().isLocalActive() && isLikelyMonitorRequest(text)) {
+            addUser(text)
+            addSystem("Local mode starts monitoring from the Background card. Open Background, choose the app/contact, then tap Start Monitoring.")
             return
         }
 
@@ -152,7 +152,7 @@ class TaskFlowController(
             return
         }
 
-        addUser(typedInput ?: "monitor ${trimmedLabel} on ${target.app}")
+        typedInput?.let { addUser(it) }
         val missing = AppCapabilityCoordinator.missingMonitorRequirements(activity)
         if (missing.isNotEmpty()) {
             Toast.makeText(
@@ -252,9 +252,19 @@ class TaskFlowController(
 
     private fun checkAutoReplyConfirmation() {
         val autoReplyManager = AutoReplyManager.getInstance()
-        if (!autoReplyManager.isEnabled) return
+        if (!autoReplyManager.isEnabled) {
+            lastMonitorStatusNote = null
+            return
+        }
         val contacts = autoReplyManager.monitoredContacts.joinToString(", ")
-        addSystem("✓ Auto-reply active for $contacts.\nMonitoring in background — stop from bar above.")
+        if (contacts.isBlank()) {
+            lastMonitorStatusNote = null
+            return
+        }
+        val note = "✓ Auto-reply active for $contacts.\nMonitoring in background — stop from bar above."
+        if (note == lastMonitorStatusNote) return
+        addSystem(note)
+        lastMonitorStatusNote = note
         XLog.i(TAG, "checkAutoReplyConfirmation: monitor active, staying in PokeClaw")
     }
 
@@ -263,9 +273,6 @@ class TaskFlowController(
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 activity.requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 101)
             }
-        }
-        if (!ForegroundService.isRunning()) {
-            ForegroundService.start(activity)
         }
     }
 
@@ -286,19 +293,38 @@ class TaskFlowController(
             return null
         }
 
-        val historyLines = uiState.messages.mapNotNull { message ->
-            val content = message.content.trim()
-            if (content.isEmpty() || content == "...") {
-                return@mapNotNull null
-            }
-            when (message.role) {
-                ChatMessage.Role.USER -> "User: $content"
-                ChatMessage.Role.ASSISTANT -> "Assistant: $content"
-                ChatMessage.Role.SYSTEM -> "System: $content"
-                ChatMessage.Role.TOOL_GROUP -> null
-            }
-        }
+        val historyLines = CloudContextHandoffFormatter.conversationLines(uiState.messages)
+        val backgroundStatus = buildBackgroundStatusContext()
 
-        return TaskPromptEnvelope.build(historyLines, rawTask)
+        return TaskPromptEnvelope.build(
+            chatHistoryLines = historyLines,
+            currentRequest = rawTask,
+            backgroundState = backgroundStatus,
+        )
+    }
+
+    private fun buildBackgroundStatusContext(): String? {
+        val autoReplyManager = AutoReplyManager.getInstance()
+        if (!autoReplyManager.isEnabled) return null
+
+        val contacts = autoReplyManager.monitoredContacts.toList()
+        if (contacts.isEmpty()) return null
+
+        return buildString {
+            append("Background monitor active for: ")
+            append(contacts.joinToString(", "))
+            append('.')
+        }
+    }
+
+    private fun isLikelyMonitorRequest(text: String): Boolean {
+        val lower = text.lowercase()
+        val mentionsMonitor = lower.contains("monitor") ||
+            lower.contains("auto-reply") ||
+            lower.contains("auto reply") ||
+            lower.contains("autoreply")
+        val looksLikeWatchMessages = lower.contains("watch") &&
+            (lower.contains("message") || lower.contains("messages") || lower.contains("reply"))
+        return mentionsMonitor || looksLikeWatchMessages
     }
 }

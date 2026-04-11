@@ -12,7 +12,6 @@ import io.agents.pokeclaw.R
 import io.agents.pokeclaw.AppCapabilityCoordinator
 import io.agents.pokeclaw.AppRequirement
 import io.agents.pokeclaw.base.BaseActivity
-import io.agents.pokeclaw.service.ForegroundService
 import io.agents.pokeclaw.utils.KVUtils
 
 class GuideActivity : BaseActivity() {
@@ -36,7 +35,13 @@ class GuideActivity : BaseActivity() {
             R.string.guide_title_notification,
             R.string.guide_desc_notification
         ) {
-            ForegroundService.start(this)
+            if (!AppCapabilityCoordinator.isNotificationPermissionGranted(this)) {
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                    requestPermissions(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), 100)
+                }
+            } else {
+                Toast.makeText(this, R.string.home_notification_enabled, Toast.LENGTH_SHORT).show()
+            }
         }
         bindSection(
             findViewById(R.id.guideOverlay),

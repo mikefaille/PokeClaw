@@ -6,6 +6,7 @@ package io.agents.pokeclaw.debug
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import io.agents.pokeclaw.agent.llm.ModelConfigRepository
 import io.agents.pokeclaw.appViewModel
 import io.agents.pokeclaw.channel.Channel
 import io.agents.pokeclaw.utils.KVUtils
@@ -38,13 +39,14 @@ class DebugTaskReceiver : BroadcastReceiver() {
                 val baseUrl = intent.getStringExtra("base_url")
                 val modelName = intent.getStringExtra("model_name")
                 val provider = intent.getStringExtra("provider") ?: "OPENAI"
-                if (apiKey != null) KVUtils.setLlmApiKey(apiKey)
-                if (modelName != null) KVUtils.setLlmModelName(modelName)
-                KVUtils.setLlmProvider(provider)
                 if (provider == "LOCAL") {
                     // For local LLM, base_url = model file path
                     if (baseUrl != null) {
-                        KVUtils.setLocalModelPath(baseUrl)
+                        ModelConfigRepository.saveLocalDefault(
+                            modelPath = baseUrl,
+                            modelId = modelName ?: "",
+                            activateNow = true,
+                        )
                         KVUtils.setLlmBaseUrl(baseUrl)
                     }
                 } else {
@@ -52,7 +54,13 @@ class DebugTaskReceiver : BroadcastReceiver() {
                     val resolvedBaseUrl = baseUrl
                         ?: io.agents.pokeclaw.agent.CloudProvider.findProviderForModel(modelName ?: "")?.defaultBaseUrl
                         ?: "https://api.openai.com/v1"
-                    KVUtils.setLlmBaseUrl(resolvedBaseUrl)
+                    ModelConfigRepository.saveCloudDefault(
+                        providerName = provider,
+                        modelId = modelName ?: "",
+                        baseUrl = resolvedBaseUrl,
+                        apiKey = apiKey ?: "",
+                        activateNow = true,
+                    )
                 }
                 val vm = io.agents.pokeclaw.ClawApplication.appViewModelInstance
                 vm.updateAgentConfig()
