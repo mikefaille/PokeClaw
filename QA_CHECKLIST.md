@@ -6,6 +6,29 @@ Every build must pass ALL checks before shipping.
 
 ## QA Methodology — How to Test (READ THIS FIRST)
 
+### Three QA Layers — Do Not Mix These Up
+
+Use all three. Do not claim a user-facing fix from backend smoke alone.
+
+1. **Backend smoke**
+   - Fast validation through ADB + logcat.
+   - Proves tool routing, rules, runtime guards, and final backend result.
+   - Does **not** by itself prove that the result showed up in the visible chatroom.
+
+2. **Chatroom bridge smoke**
+   - Short user-visible verification.
+   - Proves that once backend has a result, the answer appears in the same chatroom as a visible assistant bubble and is persisted to the current conversation.
+   - Use this whenever changing chat/task result rendering, auto-return, or task-to-chat bridging.
+
+3. **True E2E**
+   - Full user path: tap/type/send/watch/verify.
+   - Use this for release confidence, major regressions, and high-risk flows such as send-message, monitor, permission flows, and context handoff.
+
+Rule of thumb:
+- backend-only bug -> backend smoke first, then at least one chatroom bridge check
+- user-visible chat/task behavior -> backend smoke + chatroom bridge
+- shipping / RC claims -> real E2E, not smoke theater
+
 ### Device Setup
 
 ```bash
@@ -330,6 +353,10 @@ Do **not** rerun the entire world after every refactor. Rerun the right bundle f
   - `B1-B5`
   - `M7-M21`
   - relevant quick-task sweeps
+- **Direct device-data / no-false-denial changes**
+  - `DD1-DD7`
+  - `R1-R6`
+  - `Q2-2`, `Q3-2`
 - **Release / installer / updater changes**
   - `Dbg-u1-Dbg-u3`
   - `Rel-s1-Rel-s7`
@@ -494,6 +521,16 @@ Design principle: User perspective. INFO tasks → report actual data. ACTION ta
 - [ ] **M36. Math**: "whats 234 times 891" → "208,494", NO tools
 - [ ] **M37. Timezone**: "what time is it in tokyo" → time answer, NO tools
 - [ ] **M38. Cancel**: "nvm" → acknowledges, does nothing
+
+## DD. Direct Device-Data Guard Regressions
+
+- [ ] **DD1. Clipboard explain uses tool, not denial**: Cloud input `read my clipboard and explain what it says` → calls `clipboard(action="get")` before answering; must NOT answer with a generic privacy/device-access refusal
+- [ ] **DD2. Notifications summary uses tool, not denial**: Cloud input `read my notifications and summarize` → calls `get_notifications()`; must NOT answer as if it cannot see notifications
+- [ ] **DD3. Battery question uses direct device tool**: Cloud input `how much battery left` → calls `get_device_info(category="battery")`; must NOT answer with a generic limitation disclaimer
+- [ ] **DD4. Storage question uses direct device tool**: Cloud input `how much storage do i have free` → calls `get_device_info(category="storage")`
+- [ ] **DD5. Installed apps question uses direct tool**: Cloud input `what apps do i have` → calls `get_installed_apps()`
+- [ ] **DD6. Screen reading uses direct tool**: Cloud input `what's on my screen right now` → calls `get_screen_info()`
+- [ ] **DD7. Conceptual control stays chat**: Cloud input `what is an Android clipboard` → normal text answer; guard must not falsely force a device-data tool
 
 ### Error Handling
 - [ ] **M39. Wrong app name**: "open flurpmaster 3000" → "App not found" + suggestion
@@ -995,6 +1032,12 @@ Format: `[date] [status] [test-id] description`
 [2026-04-10] [PASS]    B4-c  Accessibility text-match hardening compile/unit bundle passed: low-level lookup now keeps Android's fast text path but falls back to a Unicode-normalized tree walk, and standard launch dialogs try stable positive-button ids before language-specific keywords
 [2026-04-10] [PASS]    Phase5-r5  Cloud send smoke passed after send-affordance hardening: `send yo to girlfriend on WhatsApp` ran on `gpt-4.1`, called `send_message(contact=\"girlfriend\", message=\"yo\", app=\"WhatsApp\")`, finished in 2 rounds, and auto-returned with `Task completed: Sent 'yo' to your girlfriend on WhatsApp.`
 [2026-04-10] [PASS]    Phase5-r6  Chat-noise filtering is no longer English-string-bound: conversation-reading heuristics now treat timestamps and centered system labels as layout noise using shared tested rules (`ChatNoiseFilterUtilsTest`, `UiTextMatchUtilsTest`, `ContactMatchUtilsTest`)
+[2026-04-11] [FIXED]   DD-guard-1  Cloud no longer falls back to generic "I cannot access your device" denials for direct phone-data requests when a matching tool exists; the direct-device-data guard now forces a real tool attempt first and blocks text-only completion / premature `finish`
+[2026-04-11] [PASS]    DD1  Cloud task `read my clipboard and explain what it says` → `clipboard(action=get)` → real clipboard content returned and explained; no generic privacy/device-access refusal
+[2026-04-11] [PASS]    DD2  Cloud task `read my notifications and summarize` → `get_notifications()` → summarized live notifications; no false claim that notifications are inaccessible
+[2026-04-11] [PASS]    DD3  Cloud task `how much battery left` → `get_device_info(category=battery)` → answered with real battery/charging/temperature state; no generic limitation disclaimer
+[2026-04-11] [PASS]    DD5  Cloud task `what apps do i have` → `get_installed_apps()` → returned the real installed-app list; no generic chatbot fallback
+[2026-04-11] [PASS]    DD7-unit  Conceptual control `what is an Android clipboard` remains a normal chat-style case in unit coverage; the guard no longer falsely forces a clipboard tool just because the word `clipboard` appears
 ```
 
 ### Bugs Found During v9 QA

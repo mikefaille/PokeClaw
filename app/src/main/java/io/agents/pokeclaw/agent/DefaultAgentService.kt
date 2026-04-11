@@ -61,8 +61,10 @@ class DefaultAgentService : AgentService {
 - Find and tap text → find_and_tap(text="Send")
 - Send a message → send_message(contact="Mom", message="hi", app="WhatsApp")
 - Make a phone call → make_call(contact="Mom")
-- Check battery/wifi/storage → get_device_info(category="battery")
+- Check battery/wifi/storage/bluetooth/screen/device/time → get_device_info(category="battery")
 - Read notifications → get_notifications()
+- Read clipboard → clipboard(action="get")
+- List installed apps → get_installed_apps()
 - Take screenshot → take_screenshot()
 - Wait for loading → wait(duration_ms=2000)
 
@@ -72,7 +74,10 @@ class DefaultAgentService : AgentService {
 - finish(summary) must contain the ACTUAL DATA the user asked for. "Battery is at 73%" not "I checked battery."
 - Use get_device_info for battery/wifi/storage/bluetooth/screen/device/time queries. Do NOT open Settings app for these.
 - Use get_notifications to read notifications. Do NOT pull down notification shade.
+- Use clipboard(action="get") when the user asks what is on their clipboard or what they copied.
+- Use get_installed_apps() when the user asks what apps are installed.
 - Use input_text to type. Do NOT tap on autocomplete suggestions.
+- Never say you cannot access the user's clipboard, notifications, or phone state when a matching tool exists. Use the tool first.
 - Do NOT auto-fill passwords, confirm payments, or delete data."""
 
         /** Maximum number of retries on LLM API call failure */
@@ -446,6 +451,7 @@ class DefaultAgentService : AgentService {
 
         val inAppSearchGuard = InAppSearchGuard.fromTask(rawUserRequest)
         val emailComposeGuard = EmailComposeGuard.fromTask(rawUserRequest)
+        val directDeviceDataGuard = DirectDeviceDataGuard.fromTask(rawUserRequest)
 
         // For local LLM, inject matching playbook into system prompt
         val playbookSection = if (config.provider == LlmProvider.LOCAL) {
@@ -461,6 +467,7 @@ class DefaultAgentService : AgentService {
             append(playbookSection)
             append(inAppSearchGuard.buildPromptSection())
             append(emailComposeGuard.buildPromptSection())
+            append(directDeviceDataGuard.buildPromptSection())
             append(buildDeviceContext())
         }
 
@@ -636,6 +643,12 @@ class DefaultAgentService : AgentService {
                         messages.add(UserMessage.from(correction))
                         continue
                     }
+                    if (directDeviceDataGuard.shouldBlockTextOnlyCompletion()) {
+                        val correction = directDeviceDataGuard.buildCompletionCorrection()
+                        XLog.i(TAG, "DirectDeviceDataGuard blocked text-only completion for '$userPrompt'")
+                        messages.add(UserMessage.from(correction))
+                        continue
+                    }
                     if (emailComposeGuard.shouldBlockTextOnlyCompletion()) {
                         val correction = emailComposeGuard.buildCompletionCorrection()
                         XLog.i(TAG, "EmailComposeGuard blocked text-only completion for '$userPrompt'")
@@ -686,7 +699,8 @@ class DefaultAgentService : AgentService {
                     } catch (_: Exception) {
                         null
                     }
-                    inAppSearchGuard.maybeBlockFinish(screenInfo)
+                    directDeviceDataGuard.maybeBlockFinish()
+                        ?: inAppSearchGuard.maybeBlockFinish(screenInfo)
                         ?: emailComposeGuard.maybeBlockFinish(screenInfo)
                 } else null
                 if (blockedFinish != null) {
@@ -700,6 +714,7 @@ class DefaultAgentService : AgentService {
                 }
 
                 callback.onToolCall(iterations, toolName, displayName, toolArgs)
+                directDeviceDataGuard.recordToolAttempt(toolName)
                 emailComposeGuard.recordToolAttempt(toolName)
 
                 val result = ToolRegistry.getInstance().executeTool(toolName, params)
