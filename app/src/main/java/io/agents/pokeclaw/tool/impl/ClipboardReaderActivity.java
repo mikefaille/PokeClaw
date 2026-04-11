@@ -54,15 +54,15 @@ public class ClipboardReaderActivity extends Activity {
             if (clipboard == null) {
                 clipboardError = "Unable to access clipboard service";
             } else if (!clipboard.hasPrimaryClip()) {
-                clipboardError = "Clipboard is empty";
+                clipboardResult = "Clipboard is empty";
             } else {
                 ClipData clipData = clipboard.getPrimaryClip();
                 if (clipData == null || clipData.getItemCount() == 0) {
-                    clipboardError = "Clipboard is empty";
+                    clipboardResult = "Clipboard is empty";
                 } else {
                     CharSequence text = clipData.getItemAt(0).getText();
                     if (text == null || text.length() == 0) {
-                        clipboardError = "Clipboard has no text content";
+                        clipboardResult = "Clipboard has no text content";
                     } else {
                         clipboardResult = text.toString();
                     }
