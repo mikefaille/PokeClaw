@@ -243,10 +243,11 @@ This checklist is **not** yet a fully rerun 100% green master sheet. The honest 
     - App Settings truthfully shows `Connecting` during enabled-but-rebinding Accessibility state
     - App Settings truthfully shows `Notification Access = Disabled` when the listener is not enabled in system settings
     - Notification-listener auto-return is now gated by a pending permission-flow flag instead of firing on every reconnect
-  - Phase 4 local-runtime consolidation smoke:
+  - Phase 5 local-runtime consolidation smoke:
     - Shared local runtime still cold-launches into `ComposeChatActivity` with truthful `CPU` backend status
     - Real local UI send still works after runtime consolidation: `say pong` → `Pong! 🏓`
     - Assistant bubble model tag remains aligned with the actual backend after send
+    - Local single-shot and auto-reply entrypoints now share the same runtime boundary as chat/session bring-up
   - Chat bubble metadata smoke:
     - User bubbles render a subtle IG-style time footer under the bubble
     - Assistant bubbles render `model name · time` under the bubble
@@ -964,6 +965,8 @@ Format: `[date] [status] [test-id] description`
 [2026-04-10] [NOTE]    TgMon-r1  Telegram monitor QA now requires an external sender path (second account or bot token + existing bot chat); without that sender, Telegram incoming-message monitor cases must be marked `BLOCKED`
 [2026-04-10] [PASS]    Phase4-r3  Monitor target parser unit bundle passed: `monitor Mom on Telegram`, default WhatsApp when app is omitted, `watch Alex on sms` -> `Messages`, and `monitor Caroline` does not get misparsed as `LINE`
 [2026-04-10] [PASS]    Phase4-r4  Live device dialog smoke: Monitor dialog now shows the supported app list (`WhatsApp`, `Telegram`, `Messages`, `LINE`, `WeChat`) and retained `Telegram` as the selected app in the live screenshot instead of collapsing back to WhatsApp
+[2026-04-10] [PASS]    Phase5-r1  Local runtime consolidation compile gate: `LocalModelRuntime` now owns shared `openConversation(...)` and `runSingleShot(...)`, and `ChatSessionController`, `LocalLlmClient`, `LlmSessionManager.singleShotLocal()`, and `AutoReplyManager.generateReplyLocal()` all compile against the same runtime boundary (`compileDebugKotlin`, `compileDebugJavaWithJavac`, `assembleDebug`)
+[2026-04-10] [BLOCKED] Phase5-r2  Targeted device smoke for the new shared local runtime boundary is blocked by ADB attach state (`adb devices -l` returned no attached devices after the Phase 5 landing). Re-run `H4/H4-b`, `Q3-1`, `Q5-1`, `Q5-1b`, and the local quick-task bundle as soon as the Pixel is visible again instead of treating the missing device as an app regression
 [2026-04-10] [NOTE]    QA-wf-r2  Device-state guard for Compose UI smoke: if notification shade or another app steals foreground, collapse/foreground PokeClaw again before judging the refactor; if IME moves the input bar, re-dump live bounds instead of reusing stale tap coordinates
 ```
 

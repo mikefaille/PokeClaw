@@ -186,7 +186,9 @@ class ChatSessionController(
                     } catch (_: Exception) {
                     }
                     conversation = null
-                    conversation = createConversationWithRetries(currentModelPath, buildConversationConfig())
+                    val lease = LocalModelRuntime.openConversation(activity, currentModelPath, buildConversationConfig())
+                    engine = lease.engine
+                    conversation = lease.conversation
                     isModelReady = true
                     postToMain {
                         updateLocalModelStatus(currentModelPath)
@@ -389,7 +391,9 @@ class ChatSessionController(
             }
             val modelPath = ModelConfigRepository.snapshot().local.modelPath.ifEmpty { loadedModelPath.orEmpty() }
             if (modelPath.isNotEmpty()) {
-                conversation = createConversationWithRetries(modelPath, buildConversationConfig())
+                val lease = LocalModelRuntime.openConversation(activity, modelPath, buildConversationConfig())
+                engine = lease.engine
+                conversation = lease.conversation
                 isModelReady = true
             }
             postToMain {
@@ -414,12 +418,16 @@ class ChatSessionController(
                     val recentMsgs = messages.takeLast(5)
                     val systemPrompt = ConversationCompactor.buildRestoredSystemPrompt(activity, conversationId, recentMsgs)
                     val modelPath = ModelConfigRepository.snapshot().local.modelPath.ifEmpty { loadedModelPath.orEmpty() }
-                    conversation = createConversationWithRetries(modelPath,
-                        ConversationConfig(
+                    val lease = LocalModelRuntime.openConversation(
+                        context = activity,
+                        modelPath = modelPath,
+                        conversationConfig = ConversationConfig(
                             systemInstruction = Contents.of(systemPrompt),
                             samplerConfig = SamplerConfig(topK = 64, topP = 0.95, temperature = 0.7)
                         )
                     )
+                    engine = lease.engine
+                    conversation = lease.conversation
                     isModelReady = true
                     postToMain {
                         setButtonsEnabled(true)
@@ -443,10 +451,10 @@ class ChatSessionController(
             conversation = null
             Thread.sleep(200)
 
-            val lease = LocalModelRuntime.acquireSharedEngine(activity, modelPath)
+            val lease = LocalModelRuntime.openConversation(activity, modelPath, buildConversationConfig())
             engine = lease.engine
             XLog.i(TAG, "loadModel: engine ready (${lease.backendLabel})")
-            conversation = createConversationWithRetries(modelPath, buildConversationConfig())
+            conversation = lease.conversation
 
             isModelReady = true
             loadedModelPath = modelPath
@@ -481,32 +489,6 @@ class ChatSessionController(
         }
     }
 
-    private fun createConversationWithRetries(modelPath: String, convConfig: ConversationConfig): Conversation {
-        var lastError: Exception? = null
-        for (attempt in 1..5) {
-            try {
-                val sharedEngine = engine ?: throw IllegalStateException("Local engine not initialized")
-                return sharedEngine.createConversation(convConfig)
-            } catch (e: Exception) {
-                lastError = e
-                XLog.w(TAG, "createConversationWithRetries attempt $attempt failed: ${e.message}")
-                if (attempt == 3) {
-                    XLog.w(TAG, "createConversationWithRetries: resetting shared runtime")
-                    try {
-                        LocalModelRuntime.resetSharedEngine()
-                        engine = LocalModelRuntime.acquireSharedEngine(activity, modelPath).engine
-                    } catch (resetErr: Exception) {
-                        XLog.e(TAG, "createConversationWithRetries: runtime reset failed", resetErr)
-                    }
-                }
-                if (attempt < 5) {
-                    Thread.sleep(1500)
-                }
-            }
-        }
-        throw RuntimeException("Failed to create conversation after 5 retries: ${lastError?.message}", lastError)
-    }
-
     private fun retryLocalChatOnCpu(modelPath: String, text: String): String {
         require(modelPath.isNotEmpty()) { "Local model path missing for CPU retry" }
         try {
@@ -514,10 +496,16 @@ class ChatSessionController(
         } catch (_: Exception) {
         }
         conversation = null
-        val lease = LocalModelRuntime.forceCpuEngine(activity, modelPath)
+        LocalModelRuntime.forceCpuEngine(activity, modelPath)
+        val lease = LocalModelRuntime.openConversation(
+            context = activity,
+            modelPath = modelPath,
+            conversationConfig = buildConversationConfig(),
+            preferCpu = true,
+        )
         engine = lease.engine
         loadedModelPath = modelPath
-        conversation = createConversationWithRetries(modelPath, buildConversationConfig())
+        conversation = lease.conversation
         XLog.i(TAG, "retryLocalChatOnCpu: CPU runtime ready, retrying sendMessage")
         return conversation!!.sendMessage(text)?.toString() ?: "(no response)"
     }

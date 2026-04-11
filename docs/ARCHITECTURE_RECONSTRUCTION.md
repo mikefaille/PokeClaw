@@ -451,7 +451,7 @@ Split monitor setup into a structured target model that carries:
 ### Status
 
 - In progress on `main`
-- Current landing scope: add `LocalModelRuntime` so shared engine acquisition, GPU→CPU fallback, and backend-truth lookup stop being duplicated across `ChatSessionController`, `LocalLlmClient`, and `LlmSessionManager`
+- Current landing scope: `LocalModelRuntime` now owns shared engine acquisition, conversation opening, and single-shot inference so chat, local agent, and auto-reply stop carrying three separate lifecycle implementations
 
 ### Goal
 
@@ -462,7 +462,7 @@ Separate model file management from model runtime management.
 Split concerns so:
 
 - `LocalModelManager` handles files, downloads, validation, compatibility metadata
-- a dedicated runtime layer handles engine acquisition, backend fallback, live session ownership
+- a dedicated runtime layer handles engine acquisition, conversation creation/retry, single-shot inference, backend fallback, and live session ownership
 
 ### Why
 
@@ -491,6 +491,13 @@ This is the phase that makes lower-RAM support and more local models safer to ad
   - tapped the live send-button bounds
   - assistant replied `Pong! 🏓`
   - top status and assistant model tag both remained `CPU`
+- Phase 5 landing scope is now compile-gated:
+  - `ChatSessionController` conversation bring-up goes through `LocalModelRuntime.openConversation(...)`
+  - `LocalLlmClient` tool-call conversations go through the same runtime boundary
+  - `LlmSessionManager.singleShotLocal()` and `AutoReplyManager.generateReplyLocal()` both route through `LocalModelRuntime.runSingleShot(...)`
+- Current limitation:
+  - the Phase 5 device smoke rerun is temporarily blocked by ADB attach state (`adb devices -l` returned no device after the landing)
+  - do not infer a product regression from that block; rerun `H4/H4-b`, `Q3-1`, `Q5-1`, `Q5-1b`, and `LQ1-LQ13` as soon as the Pixel is visible again
 - Practical QA note:
   - stale absolute tap coordinates are not a valid regression signal once the IME shifts the input bar
   - for Compose chat smoke, collapse any notification shade / foreground interruption first, then re-dump live bounds before tapping send

@@ -542,28 +542,10 @@ public class AutoReplyManager {
     }
 
     private String generateReplyLocal(String prompt) {
-        String modelPath = io.agents.pokeclaw.utils.KVUtils.INSTANCE.getLocalModelPath();
-        if (modelPath == null || modelPath.isEmpty()) {
-            XLog.w(TAG, "generateReplyLocal: no model path");
-            return null;
-        }
-
-        String cacheDir = io.agents.pokeclaw.ClawApplication.Companion.getInstance().getCacheDir().getPath();
-        io.agents.pokeclaw.agent.llm.EngineHolder.INSTANCE.close();
-        com.google.ai.edge.litertlm.Engine engine =
-            io.agents.pokeclaw.agent.llm.EngineHolder.INSTANCE.getOrCreate(modelPath, cacheDir);
-
-        com.google.ai.edge.litertlm.Contents sysPrompt = com.google.ai.edge.litertlm.Contents.Companion.of(REPLY_SYSTEM_PROMPT);
-        com.google.ai.edge.litertlm.SamplerConfig sampler =
-            new com.google.ai.edge.litertlm.SamplerConfig(64, 0.95, 0.7, 0);
-        com.google.ai.edge.litertlm.Conversation conv = engine.createConversation(
-            new com.google.ai.edge.litertlm.ConversationConfig(sysPrompt, java.util.Collections.emptyList(), java.util.Collections.emptyList(), sampler)
+        XLog.i(TAG, "generateReplyLocal: using LlmSessionManager");
+        String reply = io.agents.pokeclaw.agent.llm.LlmSessionManager.INSTANCE.singleShotLocal(
+            REPLY_SYSTEM_PROMPT, prompt, 0.7
         );
-
-        com.google.ai.edge.litertlm.Message response = conv.sendMessage(prompt, java.util.Collections.emptyMap());
-        conv.close();
-
-        String reply = response.getContents() != null ? response.getContents().toString().trim() : "";
         if (reply != null) {
             reply = reply.replaceAll("^[\"']|[\"']$", "").trim();
             if (reply.startsWith("Your reply:")) reply = reply.substring(11).trim();

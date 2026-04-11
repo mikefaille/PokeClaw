@@ -23,6 +23,7 @@ import io.agents.pokeclaw.utils.XLog
 object LlmSessionManager {
 
     private const val TAG = "LlmSessionManager"
+    private const val DEFAULT_LOCAL_SYSTEM_PROMPT = "You are a helpful assistant. Answer concisely."
 
     /**
      * Create a Cloud LLM ChatModel using the user's current config.
@@ -134,36 +135,26 @@ object LlmSessionManager {
      * Single-shot Local LLM call using LiteRT-LM.
      */
     fun singleShotLocal(prompt: String, temperature: Double = 0.3): String? {
+        return singleShotLocal(
+            systemPrompt = DEFAULT_LOCAL_SYSTEM_PROMPT,
+            prompt = prompt,
+            temperature = temperature
+        )
+    }
+
+    fun singleShotLocal(systemPrompt: String, prompt: String, temperature: Double = 0.3): String? {
         return try {
             val modelPath = ModelConfigRepository.snapshot().local.modelPath
             if (modelPath.isNullOrEmpty()) return null
 
             val context = io.agents.pokeclaw.ClawApplication.instance
-            fun runSingleShot() : String? {
-                val engine = LocalModelRuntime.acquireSharedEngine(context, modelPath).engine
-                val conv = engine.createConversation(
-                    com.google.ai.edge.litertlm.ConversationConfig(
-                        com.google.ai.edge.litertlm.Contents.of("You are a helpful assistant. Answer concisely."),
-                        emptyList(), emptyList(),
-                        com.google.ai.edge.litertlm.SamplerConfig(64, 0.95, temperature, 0)
-                    )
-                )
-                return try {
-                    val response = conv.sendMessage(prompt, emptyMap())
-                    response.contents?.toString()?.trim()
-                } finally {
-                    conv.close()
-                }
-            }
-
-            try {
-                runSingleShot()
-            } catch (e: Exception) {
-                if (!LocalModelRuntime.isGpuBackendFailure(e)) throw e
-                XLog.w(TAG, "singleShotLocal: GPU path failed, retrying on CPU: ${e.message}")
-                LocalModelRuntime.forceCpuEngine(context, modelPath)
-                runSingleShot()
-            }
+            LocalModelRuntime.runSingleShot(
+                context = context,
+                modelPath = modelPath,
+                systemPrompt = systemPrompt,
+                prompt = prompt,
+                temperature = temperature,
+            ).text
         } catch (e: Exception) {
             XLog.w(TAG, "singleShotLocal failed: ${e.message}")
             null

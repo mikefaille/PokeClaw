@@ -126,33 +126,15 @@ class LocalLlmClient(private val config: AgentConfig) : LlmClient {
             automaticToolCalling = false  // We handle execution in DefaultAgentService
         )
 
-        // Retry with backoff — another client (chat UI) may still be closing its session
-        var lastError: Exception? = null
-        for (attempt in 1..5) {
-            try {
-                val eng = engine ?: throw RuntimeException("LiteRT-LM engine not initialized — check model path: ${config.baseUrl}")
-                conversation = eng.createConversation(convConfig)
-                processedMessageCount = 0
-                return
-            } catch (e: Exception) {
-                lastError = e
-                XLog.w(TAG, "createConversation attempt $attempt failed: ${e.message}")
-                if (attempt == 3) {
-                    try {
-                        LocalModelRuntime.resetSharedEngine()
-                        engine = LocalModelRuntime.acquireSharedEngine(
-                            context = ClawApplication.instance,
-                            modelPath = config.baseUrl,
-                            preferCpu = gpuFailed,
-                        ).engine
-                    } catch (resetError: Exception) {
-                        XLog.e(TAG, "createConversation: shared runtime reset failed", resetError)
-                    }
-                }
-                if (attempt < 5) Thread.sleep(1500)
-            }
-        }
-        throw RuntimeException("Failed to create conversation after 5 retries: ${lastError?.message}", lastError)
+        val lease = LocalModelRuntime.openConversation(
+            context = ClawApplication.instance,
+            modelPath = config.baseUrl,
+            conversationConfig = convConfig,
+            preferCpu = gpuFailed,
+        )
+        engine = lease.engine
+        conversation = lease.conversation
+        processedMessageCount = 0
     }
 
     private var sendCount = 0

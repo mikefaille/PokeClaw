@@ -5,7 +5,11 @@ package io.agents.pokeclaw.agent.llm
 
 import android.content.Context
 import com.google.ai.edge.litertlm.Backend
+import com.google.ai.edge.litertlm.Conversation
+import com.google.ai.edge.litertlm.ConversationConfig
+import com.google.ai.edge.litertlm.Contents
 import com.google.ai.edge.litertlm.Engine
+import com.google.ai.edge.litertlm.SamplerConfig
 import io.agents.pokeclaw.utils.KVUtils
 import io.agents.pokeclaw.utils.XLog
 
@@ -14,9 +18,23 @@ data class LocalEngineLease(
     val backendLabel: String,
 )
 
+data class LocalConversationLease(
+    val engine: Engine,
+    val conversation: Conversation,
+    val backendLabel: String,
+)
+
+data class LocalSingleShotResult(
+    val text: String?,
+    val backendLabel: String,
+)
+
 object LocalModelRuntime {
 
     private const val TAG = "LocalModelRuntime"
+    private const val DEFAULT_RETRY_COUNT = 5
+    private const val DEFAULT_RESET_ATTEMPT = 3
+    private const val DEFAULT_RETRY_SLEEP_MS = 1500L
 
     fun acquireSharedEngine(
         context: Context,
@@ -56,6 +74,91 @@ object LocalModelRuntime {
 
     fun currentBackendLabel(modelPath: String?): String? {
         return EngineHolder.getBackendLabel(modelPath)
+    }
+
+    fun openConversation(
+        context: Context,
+        modelPath: String,
+        conversationConfig: ConversationConfig,
+        preferCpu: Boolean = false,
+        maxRetries: Int = DEFAULT_RETRY_COUNT,
+    ): LocalConversationLease {
+        var lastError: Exception? = null
+        var forceCpu = preferCpu
+
+        for (attempt in 1..maxRetries) {
+            try {
+                val engineLease = acquireSharedEngine(context, modelPath, preferCpu = forceCpu)
+                val conversation = engineLease.engine.createConversation(conversationConfig)
+                return LocalConversationLease(
+                    engine = engineLease.engine,
+                    conversation = conversation,
+                    backendLabel = engineLease.backendLabel,
+                )
+            } catch (e: Exception) {
+                lastError = e
+                XLog.w(TAG, "openConversation attempt $attempt failed for $modelPath: ${e.message}")
+
+                if (!forceCpu && isGpuBackendFailure(e)) {
+                    XLog.w(TAG, "openConversation: GPU path failed, forcing CPU for $modelPath")
+                    forceCpuEngine(context, modelPath)
+                    forceCpu = true
+                } else if (attempt == DEFAULT_RESET_ATTEMPT) {
+                    XLog.w(TAG, "openConversation: resetting shared runtime for $modelPath")
+                    try {
+                        resetSharedEngine()
+                    } catch (resetError: Exception) {
+                        XLog.e(TAG, "openConversation: shared runtime reset failed", resetError)
+                    }
+                }
+
+                if (attempt < maxRetries) {
+                    Thread.sleep(DEFAULT_RETRY_SLEEP_MS)
+                }
+            }
+        }
+
+        throw RuntimeException(
+            "Failed to create conversation after $maxRetries retries: ${lastError?.message}",
+            lastError
+        )
+    }
+
+    fun runSingleShot(
+        context: Context,
+        modelPath: String,
+        systemPrompt: String,
+        prompt: String,
+        temperature: Double = 0.3,
+        preferCpu: Boolean = false,
+    ): LocalSingleShotResult {
+        val lease = openConversation(
+            context = context,
+            modelPath = modelPath,
+            conversationConfig = ConversationConfig(
+                systemInstruction = Contents.of(systemPrompt),
+                samplerConfig = SamplerConfig(
+                    topK = 64,
+                    topP = 0.95,
+                    temperature = temperature,
+                )
+            ),
+            preferCpu = preferCpu,
+        )
+
+        return try {
+            val response = lease.conversation.sendMessage(prompt, emptyMap())
+            LocalSingleShotResult(
+                text = response.contents?.toString()?.trim(),
+                backendLabel = lease.backendLabel,
+            )
+        } finally {
+            try {
+                lease.conversation.close()
+            } catch (e: Exception) {
+                XLog.w(TAG, "runSingleShot: conversation close failed", e)
+            }
+        }
     }
 
     fun isGpuBackendFailure(error: Throwable?): Boolean {
