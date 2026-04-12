@@ -42,6 +42,14 @@ import java.util.concurrent.atomic.AtomicBoolean;
  */
 public class AutoReplyManager {
 
+    private enum AutoReplyFailureStage {
+        ACCESSIBILITY_UNAVAILABLE,
+        CHAT_NAVIGATION_FAILED,
+        CONTEXT_EMPTY,
+        GENERATION_FAILED,
+        SEND_FAILED,
+    }
+
     public static final class MonitorTarget {
         private final String displayName;
         private final String appName;
@@ -303,18 +311,22 @@ public class AutoReplyManager {
 
         executor.submit(() -> {
             try {
+                logAutoReplyStep(finalTarget, "start", "incoming='" + incomingMessage + "'");
                 // Open the messaging app and navigate to the contact's chat
                 ClawAccessibilityService svc = ClawAccessibilityService.getConnectedInstance(12000L);
                 if (svc == null) {
-                    XLog.e(TAG, "No accessibility service, cannot open chat");
+                    failAutoReply(finalTarget, incomingMessage, AutoReplyFailureStage.ACCESSIBILITY_UNAVAILABLE,
+                        "No accessibility service, cannot open chat", null);
                     return;
                 }
 
+                logAutoReplyStep(finalTarget, "open-app", packageName);
                 svc.openApp(packageName);
                 Thread.sleep(2000);
 
                 // Navigate to the contact's chatroom
                 AccessibilityNodeInfo root = svc.getRootInActiveWindow();
+                boolean navigatedToChat = false;
                 if (root != null) {
                     LinkedHashSet<String> normalizedAliases = ContactMatchUtils.buildNormalizedAliases(finalContact);
                     LinkedHashSet<String> digitAliases = ContactMatchUtils.buildDigitAliases(finalContact);
@@ -353,6 +365,7 @@ public class AutoReplyManager {
 
                     if (!inChat) {
                         // Not in chat — go back to chat list, find contact, tap
+                        logAutoReplyStep(finalTarget, "navigate-chat", "not already in chat, reopening chat list");
                         svc.performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_BACK);
                         Thread.sleep(1000);
                         svc.openApp(packageName);
@@ -377,24 +390,49 @@ public class AutoReplyManager {
                                 svc.clickNode(best);
                                 XLog.i(TAG, "Tapped contact: " + finalContact);
                                 Thread.sleep(2000);
+                                navigatedToChat = waitForChatroom(svc, finalContact);
+                                logAutoReplyStep(finalTarget, "navigate-chat-result", "matches=" + matches.size() + ", verified=" + navigatedToChat);
                             } else {
-                                XLog.w(TAG, "Could not find " + finalContact + " in chat list");
+                                failAutoReply(finalTarget, incomingMessage, AutoReplyFailureStage.CHAT_NAVIGATION_FAILED,
+                                    "Could not find " + finalContact + " in chat list", null);
+                                return;
                             }
                         }
                     } else {
                         XLog.i(TAG, "Already in " + finalContact + "'s chat");
+                        navigatedToChat = true;
                     }
+                }
+
+                if (!navigatedToChat && !waitForChatroom(svc, finalContact)) {
+                    failAutoReply(finalTarget, incomingMessage, AutoReplyFailureStage.CHAT_NAVIGATION_FAILED,
+                        "Chatroom not verified before context scrape", null);
+                    return;
                 }
 
                 // NOW read conversation context — chat is visible on screen
                 String context = readConversationContext();
                 XLog.i(TAG, "Context before reply: " + (context.isEmpty() ? "(empty)" : context.length() + " chars"));
+                logAutoReplyStep(finalTarget, "context-scrape", context.isEmpty() ? "empty" : ("chars=" + context.length()));
+
+                if (context.isEmpty() && isSyntheticPendingMessage(incomingMessage)) {
+                    failAutoReply(finalTarget, incomingMessage, AutoReplyFailureStage.CONTEXT_EMPTY,
+                        "Pending replay had no readable context; skipping unsafe auto-reply", null);
+                    return;
+                }
 
                 // Generate reply with full context
                 String reply = generateReply(finalContact, incomingMessage, context);
+                if (reply == null || reply.trim().isEmpty()) {
+                    failAutoReply(finalTarget, incomingMessage, AutoReplyFailureStage.GENERATION_FAILED,
+                        "LLM did not produce a safe auto-reply", null);
+                    return;
+                }
+                logAutoReplyStep(finalTarget, "generation", "reply='" + reply + "'");
 
                 // Track our own message to avoid loop
                 ownSentMessages.add(reply);
+                boolean ownMessageTracked = true;
 
                 // We're already in the chatroom from the navigate step above
                 ToolResult result;
@@ -402,9 +440,11 @@ public class AutoReplyManager {
                 if (svc != null && isInChatroom(svc, finalContact)) {
                     // Fast path: already in chatroom, just type + send
                     XLog.i(TAG, "Fast path: already in chatroom, typing directly");
+                    logAutoReplyStep(finalTarget, "send-path", "fast");
                     result = typeAndSendInOpenChat(svc, reply);
                 } else {
                     // Full path: open app, find contact, type, send
+                    logAutoReplyStep(finalTarget, "send-path", "tool");
                     SendMessageTool sendTool = new SendMessageTool();
                     Map<String, Object> params = new HashMap<>();
                     params.put("contact", finalContact);
@@ -416,6 +456,7 @@ public class AutoReplyManager {
                 if (result.isSuccess()) {
                     XLog.i(TAG, "Auto-reply sent to " + finalContact + ": '" + reply + "'");
                     lastReplyTime.put(finalTarget.getKey(), System.currentTimeMillis());
+                    logAutoReplyStep(finalTarget, "send-success", reply);
 
                     // Dismiss the messaging app's notifications so the next message
                     // triggers a fresh notification event (not an update to existing one).
@@ -425,10 +466,15 @@ public class AutoReplyManager {
                     // future messages without forcing the user back to Home.
                     XLog.i(TAG, "Auto-reply sent; staying in current app");
                 } else {
-                    XLog.e(TAG, "Auto-reply failed: " + result.getError());
+                    if (ownMessageTracked) {
+                        ownSentMessages.remove(reply);
+                    }
+                    failAutoReply(finalTarget, incomingMessage, AutoReplyFailureStage.SEND_FAILED,
+                        "Send step failed: " + result.getError(), null);
                 }
             } catch (Exception e) {
-                XLog.e(TAG, "Auto-reply error", e);
+                failAutoReply(finalTarget, incomingMessage, AutoReplyFailureStage.SEND_FAILED,
+                    "Auto-reply pipeline crashed", e);
             } finally {
                 replying.set(false);
                 lastProcessedFingerprint = "";
@@ -478,7 +524,7 @@ public class AutoReplyManager {
 
     /**
      * Generate a reply using on-device LLM.
-     * Falls back to simple default if LLM fails.
+     * Returns null if a safe reply cannot be generated.
      */
     private static final String REPLY_SYSTEM_PROMPT =
         "You are replying to a chat message on behalf of the user. " +
@@ -508,16 +554,16 @@ public class AutoReplyManager {
             }
 
             if (reply == null || reply.isEmpty() || reply.length() > 200) {
-                XLog.w(TAG, "generateReply: LLM reply too long or empty, using fallback");
-                return fallbackReply(incomingMessage);
+                XLog.w(TAG, "generateReply: LLM reply invalid, skipping auto-reply");
+                return null;
             }
 
             XLog.i(TAG, "generateReply: LLM generated '" + reply + "' for '" + incomingMessage + "' (provider=" + provider + ")");
             return reply;
 
         } catch (Exception e) {
-            XLog.w(TAG, "generateReply: LLM failed, using fallback", e);
-            return fallbackReply(incomingMessage);
+            XLog.w(TAG, "generateReply: LLM failed, skipping auto-reply", e);
+            return null;
         }
     }
 
@@ -543,13 +589,6 @@ public class AutoReplyManager {
             if (reply.startsWith("Your reply:")) reply = reply.substring(11).trim();
         }
         return reply;
-    }
-
-    private String fallbackReply(String message) {
-        String lower = message.toLowerCase();
-        if (lower.contains("hi") || lower.contains("hello") || lower.contains("hey")) return "Hey! What's up?";
-        if (lower.contains("miss") || lower.contains("love")) return "Miss you too! ❤️";
-        return "Got it, thanks!";
     }
 
     /**
@@ -640,6 +679,38 @@ public class AutoReplyManager {
             normalizedAliases,
             digitAliases
         );
+    }
+
+    private boolean waitForChatroom(ClawAccessibilityService service, String contact) {
+        for (int attempt = 1; attempt <= 4; attempt++) {
+            if (isInChatroom(service, contact)) {
+                return true;
+            }
+            try {
+                Thread.sleep(500);
+            } catch (InterruptedException ignored) {
+                Thread.currentThread().interrupt();
+                return false;
+            }
+        }
+        return false;
+    }
+
+    private boolean isSyntheticPendingMessage(String incomingMessage) {
+        return "(pending)".equalsIgnoreCase(incomingMessage != null ? incomingMessage.trim() : "");
+    }
+
+    private void logAutoReplyStep(MonitorTarget target, String step, String detail) {
+        XLog.i(TAG, "[trace] " + target.getDisplayLabel() + " :: " + step + " :: " + detail);
+    }
+
+    private void failAutoReply(MonitorTarget target, String incomingMessage, AutoReplyFailureStage stage, String detail, Exception error) {
+        String message = "[trace] " + target.getDisplayLabel() + " :: fail@" + stage.name() + " :: " + detail;
+        if (error == null) {
+            XLog.w(TAG, message + " | incoming='" + incomingMessage + "'");
+        } else {
+            XLog.w(TAG, message + " | incoming='" + incomingMessage + "'", error);
+        }
     }
 
     /**
