@@ -176,19 +176,6 @@ These run instantly with zero tokens:
 | Lock phone | System key |
 | Go back / home | System key |
 
-### What each tier can do
-
-| | Free | Local LLM | Cloud LLM |
-|---|---|---|---|
-| Open apps, screenshot, lock, system keys | ✅ instant | ✅ instant | ✅ instant |
-| Battery, storage, WiFi, Bluetooth status | basic only | ✅ natural language | ✅ natural language |
-| Read clipboard and notifications | - | ✅ | ✅ |
-| Send messages, make calls | - | ✅ with playbook | ✅ |
-| In-app search (YouTube, Chrome, Play Store) | - | partial | ✅ |
-| Cross-app tasks (Gmail to Chrome) | - | - | ✅ |
-| Background auto-reply monitor | ✅ plumbing | ✅ local LLM replies | ✅ stronger context |
-| Conversation memory across restarts | - | ✅ | ✅ |
-| Works offline, no account needed | ✅ | ✅ | - |
 
 ## How it works
 
