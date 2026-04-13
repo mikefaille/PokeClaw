@@ -47,7 +47,6 @@ object DebugReportManager {
         val httpLogs = httpDir.listFiles()?.size ?: 0
         val autoReplyManager = AutoReplyManager.getInstance()
         val monitorTargets = autoReplyManager.monitoredTargets.joinToString(", ") { it.displayLabel }
-<<<<<<< HEAD
         val cpuSafeAt = KVUtils.getLocalCpuSafeAt()
         val gpuVerifiedAt = KVUtils.getLocalGpuVerifiedAt()
         val gpuRearmEligible = LocalBackendHealth.shouldRearmVerifiedGpu(
@@ -58,8 +57,6 @@ object DebugReportManager {
             cpuSafeAtMs = cpuSafeAt,
             nowMs = System.currentTimeMillis(),
         )
-=======
->>>>>>> 5756b90 (support: include monitor and listener state in reports)
         return buildString {
             appendLine("PokeClaw Debug Report")
             appendLine("Generated: ${Date()}")
