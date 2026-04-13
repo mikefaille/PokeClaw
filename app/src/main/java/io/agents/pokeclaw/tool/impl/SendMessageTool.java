@@ -211,7 +211,7 @@ public class SendMessageTool extends BaseTool {
     private boolean findAndTapContact(ClawAccessibilityService service, String contact) throws InterruptedException {
         java.util.LinkedHashSet<String> normalizedAliases = ContactMatchUtils.buildNormalizedAliases(contact);
         java.util.LinkedHashSet<String> digitAliases = ContactMatchUtils.buildDigitAliases(contact);
-        return ContactListUiUtils.scrollAndFindAndClick(service, normalizedAliases, digitAliases, 10, 800);
+        return ContactListUiUtils.searchOrScrollAndFindAndClick(service, contact, normalizedAliases, digitAliases, 12, 800);
     }
 
     /**

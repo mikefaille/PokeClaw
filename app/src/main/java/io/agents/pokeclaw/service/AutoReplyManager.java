@@ -373,7 +373,7 @@ public class AutoReplyManager {
                         Thread.sleep(2000);
                         root = svc.getRootInActiveWindow();
                         if (root != null) {
-                            boolean clicked = ContactListUiUtils.scrollAndFindAndClick(svc, normalizedAliases, digitAliases, 10, 800);
+                            boolean clicked = ContactListUiUtils.searchOrScrollAndFindAndClick(svc, finalContact, normalizedAliases, digitAliases, 12, 800);
                             if (clicked) {
                                 XLog.i(TAG, "Tapped contact: " + finalContact);
                                 Thread.sleep(2000);
