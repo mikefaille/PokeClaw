@@ -89,6 +89,18 @@
             android:exported="false"
             android:excludeFromRecents="true"
             android:theme="@style/Theme.Transparent" />
+        <activity
+            android:name=".automation.ExternalAutomationActivity"
+            android:exported="true"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:theme="@style/Theme.Transparent">
+            <intent-filter>
+                <action android:name="io.agents.pokeclaw.RUN_TASK" />
+                <action android:name="io.agents.pokeclaw.RUN_CHAT" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
 
         <receiver
             android:name=".debug.DebugTaskReceiver"

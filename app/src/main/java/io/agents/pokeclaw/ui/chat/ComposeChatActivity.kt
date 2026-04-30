@@ -17,7 +17,7 @@ import androidx.compose.runtime.collectAsState
 import io.agents.pokeclaw.TaskEvent
 import io.agents.pokeclaw.agent.llm.ModelConfigRepository
 import io.agents.pokeclaw.automation.ExternalAutomationContract
-import io.agents.pokeclaw.automation.ExternalAutomationReceiver
+import io.agents.pokeclaw.automation.ExternalAutomationEntrypoint
 import io.agents.pokeclaw.appViewModel
 import io.agents.pokeclaw.floating.FloatingCircleManager
 import io.agents.pokeclaw.ui.settings.LlmConfigActivity
@@ -327,9 +327,9 @@ class ComposeChatActivity : ComponentActivity() {
         pendingExternalReturnAction = null
         pendingExternalReturnPackage = null
         if (!isTask) return
-        pendingExternalRequestId = intent?.getStringExtra(ExternalAutomationReceiver.EXTRA_EXTERNAL_REQUEST_ID)
-        pendingExternalReturnAction = intent?.getStringExtra(ExternalAutomationReceiver.EXTRA_EXTERNAL_RETURN_ACTION)
-        pendingExternalReturnPackage = intent?.getStringExtra(ExternalAutomationReceiver.EXTRA_EXTERNAL_RETURN_PACKAGE)
+        pendingExternalRequestId = intent?.getStringExtra(ExternalAutomationEntrypoint.EXTRA_EXTERNAL_REQUEST_ID)
+        pendingExternalReturnAction = intent?.getStringExtra(ExternalAutomationEntrypoint.EXTRA_EXTERNAL_RETURN_ACTION)
+        pendingExternalReturnPackage = intent?.getStringExtra(ExternalAutomationEntrypoint.EXTRA_EXTERNAL_RETURN_PACKAGE)
     }
 
     private fun sendExternalAutomationTerminalCallback(event: TaskEvent) {

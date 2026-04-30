@@ -482,18 +482,18 @@ Copy this block into the current coverage snapshot or QA debug changelog for eve
   - `FAIL`: ...
 ```
 
-### Release Gate Record — v0.6.11 (2026-04-30)
+### Release Gate Record — v0.6.12 (2026-04-30)
 
 - [x] Direction gate: follows README Product Direction / Roadmap / Known platform constraints; this release adds a generic external automation harness slot instead of a one-off task prompt.
-- [x] Harness gate: production external automation receiver is user-enabled, targeted to the PokeClaw package, and routes through normal task/chat harness rules.
+- [x] Harness gate: production external automation activity/receiver entries are user-enabled, targeted to the PokeClaw package, and route through normal task/chat harness rules.
 - [x] Scope gate: no prompt/skill/playbook one-off was added solely to make a flaky task pass.
 - [x] Unit/compile gate: `./gradlew testDebugUnitTest assembleDebug` passed.
 - [x] Script hygiene gate: `bash -n scripts/e2e-quick-tasks.sh && git diff --check` passed.
 - [x] Artifact gate: local debug artifact built; signed release artifact is produced by the tag-triggered GitHub Actions release workflow using repository signing secrets.
 - [x] Targeted regression gate: `ExternalAutomationContractTest` covers task/chat parsing, base64 payloads, callback metadata, unknown action rejection, and missing payload rejection.
-- [x] Device smoke gate: Pixel 8 Pro MacroDroid `Send Intent` E2E triggered `io.agents.pokeclaw.RUN_TASK`, PokeClaw accepted it, and the chatroom visibly returned `Battery: 98%, charging, 35.2°C`.
+- [x] Device smoke gate: Pixel 8 Pro MacroDroid `Send Intent` E2E uses the exported Activity target on modern Android; debug v0.6.12 Activity-target E2E passed, and signed release v0.6.12 must rerun the same MacroDroid flow before user follow-up.
 - [x] Distribution gate: release is tag-workflow based; final signed APK/checksum must be verified from the GitHub release before user follow-up.
-- [x] User-followup gate: affected GitHub/Reddit users should be pointed to v0.6.11 for External Automation / MacroDroid / direct-device task retesting.
+- [x] User-followup gate: affected GitHub/Reddit users should be pointed to v0.6.12 for External Automation / MacroDroid / direct-device task retesting.
 - Known misses:
   - `BLOCKED`: Tasker-specific E2E is blocked by Play Store purchase requirement on the QA phone; MacroDroid E2E is verified.
   - `PARTIAL`: callback-consumer E2E remains open until a Tasker/MacroDroid receiver profile is configured.
@@ -577,8 +577,9 @@ When in doubt, rerun the smaller bundle first, then expand only if something dri
   - WhatsApp: second phone / second WhatsApp account
   - Telegram notification monitor: second Telegram account or a Telegram bot token + already-started bot chat on this device
   - Telegram bot remote-control channel: Telegram bot token configured in PokeClaw, bot polling connected, and this handset's Telegram account able to send `/start` plus a task to the bot
-- [ ] For external automation QA, Tasker/MacroDroid or an equivalent explicit broadcast sender is available:
+- [ ] For external automation QA, Tasker/MacroDroid or an equivalent explicit Activity/Broadcast intent sender is available:
   - the test must run against a release build once the production receiver exists
+  - MacroDroid/Tasker-style app automation should prefer the exported Activity target on modern Android because background broadcast receivers can be blocked from opening an Activity
   - debug-only `io.agents.pokeclaw.TASK` / `DEBUG_TASK` receivers are not enough for public integration claims
 - [ ] For missed-call QA, an external caller path is available:
   - second phone / second SIM / VoIP caller that can place a real call to this handset
@@ -639,8 +640,8 @@ When in doubt, rerun the smaller bundle first, then expand only if something dri
 - [ ] **C13. Telegram bot polling receives message**: user starts the bot from Telegram and sends a simple task → PokeClaw logcat shows Telegram update received and dispatches it through `ChannelManager`
 - [ ] **C14. Telegram bot reply path**: after a bot task completes or fails, PokeClaw sends a Telegram reply to the same chat id with a visible success/failure message
 - [ ] **C15. Telegram bot blocked account handling**: if the handset Telegram account is frozen/read-only, record `BLOCKED` with the Telegram system message and do not claim channel failure
-- [ ] **C16. Production intent task entrypoint**: with `Settings -> Remote Control -> External Automation = Enabled`, a Tasker/MacroDroid-style targeted broadcast starts the requested task in a release build:
-  `adb shell am broadcast -a io.agents.pokeclaw.RUN_TASK -p io.agents.pokeclaw --es task "how much battery left"`
+- [ ] **C16. Production intent task entrypoint**: with `Settings -> Remote Control -> External Automation = Enabled`, a Tasker/MacroDroid-style explicit Activity intent or compatible targeted broadcast starts the requested task in a release build:
+  `adb shell am start -n io.agents.pokeclaw/.automation.ExternalAutomationActivity -a io.agents.pokeclaw.RUN_TASK --es task "how much battery left"`
 - [ ] **C17. Production intent chat entrypoint**: targeted broadcast with `chat` opens/uses the chatroom path without bypassing safety rules:
   `adb shell am broadcast -a io.agents.pokeclaw.RUN_CHAT -p io.agents.pokeclaw --es chat "say hi"`
 - [ ] **C18. Production intent callback**: when `request_id` and `return_action` are provided, PokeClaw broadcasts `accepted` immediately and terminal `completed` / `failed` / `cancelled` / `blocked` / `rejected` results back to the caller
@@ -1352,6 +1353,9 @@ Format: `[date] [status] [test-id] description`
 [2026-04-30] [PARTIAL] C18-extauto-callback  Callback contract unit coverage passes and live task smoke with `request_id` / `return_action` did not crash, but no Tasker/MacroDroid callback receiver was available on the QA phone; keep true callback-consumer E2E open.
 [2026-04-30] [BLOCKED] Tasker-extauto-install  Tasker Play Store install on the QA phone is blocked by purchase requirement (`HK$34.90` shown). Do not claim Tasker-specific E2E until the paid app is installed or a user-owned license is available.
 [2026-04-30] [PASS]    MacroDroid-extauto-e2e  Installed MacroDroid, created macro `PokeClaw Battery E2E` with `Shortcut Launched` trigger and `Send Intent` action targeting `io.agents.pokeclaw.RUN_TASK`, package `io.agents.pokeclaw`, extra `task=how much battery left`; MacroDroid `Test macro` triggered PokeClaw, logged `Accepted external automation TASK`, ran the deterministic direct tool, and visibly returned `Battery: 83%, not charging, 38.1°C`.
+[2026-04-30] [BLOCKED] ExtAuto-r3-v0611-signed  Signed v0.6.11 broadcast receiver received the request but Android 16 / targetSdk 36 blocked the receiver from opening `ComposeChatActivity` from background. Do not direct users to v0.6.11 for external automation.
+[2026-04-30] [FIXED]   ExtAuto-r4-activity-entry  Added exported transparent `ExternalAutomationActivity` so MacroDroid/Tasker/Locale-style apps can launch PokeClaw as an Activity with the same `RUN_TASK` / `RUN_CHAT` contract, avoiding background-activity-launch blocking.
+[2026-04-30] [PASS]    MacroDroid-extauto-activity-e2e  Pixel 8 Pro debug v0.6.12 smoke: MacroDroid `Send Intent` Target=`Activity`, Package=`io.agents.pokeclaw`, Class=`io.agents.pokeclaw.automation.ExternalAutomationActivity`, Action=`io.agents.pokeclaw.RUN_TASK`, extra `task=how much battery left`; MacroDroid `Test macro` launched PokeClaw, logged `Accepted external automation TASK`, ran the deterministic direct tool, and visibly returned `Battery: 100%, not charging, 36.0°C`.
 ```
 
 ### Bugs Found During v9 QA

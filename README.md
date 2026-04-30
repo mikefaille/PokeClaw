@@ -332,11 +332,12 @@ Verified on a Pixel 8 Pro on 2026-04-30:
 
 - MacroDroid macro trigger: `Shortcut Launched`
 - MacroDroid action: `Send Intent`
-- Intent target: `Broadcast`
+- Intent target: `Activity`
 - Intent action: `io.agents.pokeclaw.RUN_TASK`
 - Package: `io.agents.pokeclaw`
+- Class: `io.agents.pokeclaw.automation.ExternalAutomationActivity`
 - Extra: `task = how much battery left`
-- Result: MacroDroid launched the broadcast, PokeClaw accepted it, executed the deterministic battery tool, and returned `Battery: 83%, not charging, 38.1°C` in the PokeClaw chatroom.
+- Result: MacroDroid launched PokeClaw's automation activity, PokeClaw accepted it, executed the deterministic battery tool, and returned a live battery result in the PokeClaw chatroom.
 
 MacroDroid setup:
 
@@ -344,10 +345,10 @@ MacroDroid setup:
 2. In MacroDroid, create a new macro.
 3. Add any trigger you want. For a simple smoke test, use `User Input -> Shortcut Launched`.
 4. Add action `Device Actions -> Send Intent`.
-5. Set `Target` to `Broadcast`.
+5. Set `Target` to `Activity`.
 6. Set `Action` to `io.agents.pokeclaw.RUN_TASK`.
 7. Set `Package` to `io.agents.pokeclaw`.
-8. Leave `Class`, `Data`, and `MIME type` empty unless you need a more specific Android intent shape.
+8. Set `Class` to `io.agents.pokeclaw.automation.ExternalAutomationActivity`.
 9. Set `Extra 1` name to `task`.
 10. Set `Extra 1` value to the task text, for example `how much battery left`.
 11. Save the macro, then run MacroDroid's `Test macro`.
@@ -360,7 +361,7 @@ For chat instead of task mode, use:
 - Extra name: `chat`
 - Extra value: the chat message
 
-The same pattern should work from Tasker or Locale-style tools as long as they send an explicit/targeted Android broadcast to the PokeClaw package.
+The same pattern should work from Tasker or Locale-style tools as long as they launch the exported PokeClaw automation activity with an explicit package/class. The broadcast receiver is still available for ADB and compatible callers, but Android can block a background broadcast receiver from opening an activity on modern target SDKs.
 
 Task example:
 
@@ -418,6 +419,12 @@ PokeClaw is moving fast, and the roadmap is being shaped directly by real device
 Every star helps more people find the project. Every issue helps shape the next release.
 
 ## Changelog
+
+### v0.6.12 (2026-04-30)
+- **Hotfix for Android background activity launch limits.** External automation now has an exported activity entrypoint for MacroDroid, Tasker, and Locale-style apps, avoiding Android 16 / targetSdk 36 background launch blocking when a broadcast receiver tries to open the chatroom.
+- **MacroDroid setup now uses Activity target.** The verified setup launches `io.agents.pokeclaw.automation.ExternalAutomationActivity` with `RUN_TASK` / `RUN_CHAT` and the same `task` / `chat` extras.
+- **Broadcast support remains available.** The broadcast receiver is still present for ADB and compatible callers, but app-based automation should prefer the Activity target on modern Android.
+- **Install note for early testers.** If Android reports a package/signature conflict from an older debug or early signed APK, uninstall that old build once and then install this stable signed release.
 
 ### v0.6.11 (2026-04-30)
 - **External Automation is now a production feature.** PokeClaw exposes user-enabled `RUN_TASK` and `RUN_CHAT` Android broadcast entrypoints for MacroDroid, Tasker, Locale-style automation apps, and ADB callers.
