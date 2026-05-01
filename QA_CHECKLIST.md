@@ -1397,3 +1397,10 @@ Format: `[date] [status] [test-id] description`
 - **Test ID**: CONFIG_02
 - **Status**: [PASS]
 - **Details**: Fixed the `CloudProvider.kt` context size values to match official limits and codebase patterns. Tests pass.
+
+## Pre-Commit QA: Gemini Thinking Option
+
+- **Description**: Evaluated the implementation of a "Thinking" option for Gemini 3 models.
+- **Test ID**: CONFIG_03
+- **Status**: [SKIP]
+- **Details**: Gemini 3 features like `thinkingBudget` are exposed via Google's SDK/REST API. PokeClaw accesses these models through Langchain4j's `OpenAiChatModel` which provides OpenAI API compatibility. Because the OpenAI compatibility proxy doesn't support Google-specific `thinkingConfig` parameters, this feature cannot be natively integrated without altering the architecture to use a dedicated Google AI client or waiting for upstream proxy support. No code changes were made. Tests passed successfully.
