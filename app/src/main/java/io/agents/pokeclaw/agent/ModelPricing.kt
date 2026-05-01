@@ -33,6 +33,9 @@ object ModelPricing {
         "claude-haiku-4-5" to Price(0.80, 4.00),
 
         // Google
+        "gemini-3.1-pro-preview" to Price(2.00, 12.00),
+        "gemini-3-flash-preview" to Price(0.50, 3.00),
+        "gemini-3.1-flash-lite-preview" to Price(0.25, 1.50),
         "gemini-2.5-flash" to Price(0.15, 0.60),
         "gemini-2.5-pro" to Price(1.25, 10.00),
         "gemini-2.0-flash" to Price(0.10, 0.40),

@@ -1383,3 +1383,38 @@ Format: `[date] [status] [test-id] description`
 | A11Y-r1 | Accessibility-dependent tools can false-fail during transient service rebinds | Fixed 2026-04-10: tools now wait for an enabled service to reconnect before returning `Accessibility service is not running` | Fixed |
 | Q7-local | ~~Stopping a Local task could crash with native `SIGSEGV` / `session already exists` race~~ | Fixed 2026-04-10: local cancel no longer interrupts LiteRT mid-send, and UI cleanup waits until the task-side client has closed cleanly | Fixed |
 | Bgt-1 | Existing installs could stay pinned to the legacy task budget even after code defaults increased | Fixed 2026-04-10: `TaskBudget` now one-time migrates untouched 100K / $0.50 legacy defaults to 250K / $1.00, while preserving explicit user overrides and exposing `250K` in Settings | Fixed |
+
+## Pre-Commit QA: Added new Gemini models
+
+- **Description**: Added support for Gemini 3.1 Pro Preview, Gemini 3 Flash Preview, and Gemini 3.1 Flash-Lite Preview models along with pricing details.
+- **Test ID**: CONFIG_01
+- **Status**: [PASS]
+- **Details**: Updated `CloudProvider.kt` and `ModelPricing.kt` to include the new models. Ran `./gradlew test` to ensure no regressions were introduced. Build completed successfully.
+
+## Pre-Commit QA: Fixed context sizes for Gemini models
+
+- **Description**: Updated the context sizes of Gemini 3.1 Pro Preview, Gemini 3 Flash Preview, and Gemini 3.1 Flash-Lite Preview models to 1,000,000.
+- **Test ID**: CONFIG_02
+- **Status**: [PASS]
+- **Details**: Fixed the `CloudProvider.kt` context size values to match official limits and codebase patterns. Tests pass.
+
+## Pre-Commit QA: Gemini Thinking Option
+
+- **Description**: Evaluated the implementation of a "Thinking" option for Gemini 3 models.
+- **Test ID**: CONFIG_03
+- **Status**: [SKIP]
+- **Details**: Gemini 3 features like `thinkingBudget` are exposed via Google's SDK/REST API. PokeClaw accesses these models through Langchain4j's `OpenAiChatModel` which provides OpenAI API compatibility. Because the OpenAI compatibility proxy doesn't support Google-specific `thinkingConfig` parameters, this feature cannot be natively integrated without altering the architecture to use a dedicated Google AI client or waiting for upstream proxy support. No code changes were made. Tests passed successfully.
+
+## Pre-Commit QA: Gemini Native Features Evaluation
+
+- **Description**: Re-evaluated the request to expose native Gemini features (like `thinkingConfig`).
+- **Test ID**: CONFIG_04
+- **Status**: [SKIP]
+- **Details**: Exposing native Gemini features such as `thinkingBudget` would require a dedicated native Google AI client or custom interceptor bypassing the Langchain4j OpenAI compatibility layer which is deeply integrated into PokeClaw's architecture. Modifying `OpenAiLlmClient` to inject Gemini-specific configurations into the OpenAI schema violates the API contracts on Google's OpenAI compatibility endpoint. No codebase modifications were made as this falls outside the immediate scope without a major architectural overhaul. Tests passed successfully.
+
+## Pre-Commit QA: Added Gemini native features to backlog
+
+- **Description**: Documented the missing Gemini native feature (thinkingConfig) as a P2 feature in `BACKLOG.md`.
+- **Test ID**: CONFIG_05
+- **Status**: [PASS]
+- **Details**: Added a new backlog entry indicating that a custom Google AI LLM client is needed instead of reusing the OpenAI compatibility layer in order to support Gemini 3 `thinkingBudget`.

@@ -54,7 +54,10 @@ enum class CloudProvider(
         displayName = "Google",
         defaultBaseUrl = "https://generativelanguage.googleapis.com/v1beta",
         models = listOf(
-            CloudModel("gemini-2.5-flash", "Gemini 2.5 Flash", 0.15, 0.60, ModelTier.FAST, 1_000_000, recommended = true),
+            CloudModel("gemini-3.1-pro-preview", "Gemini 3.1 Pro Preview", 2.00, 12.00, ModelTier.PRO, 1_000_000),
+            CloudModel("gemini-3-flash-preview", "Gemini 3 Flash Preview", 0.50, 3.00, ModelTier.FAST, 1_000_000, recommended = true),
+            CloudModel("gemini-3.1-flash-lite-preview", "Gemini 3.1 Flash-Lite Preview", 0.25, 1.50, ModelTier.LITE, 1_000_000),
+            CloudModel("gemini-2.5-flash", "Gemini 2.5 Flash", 0.15, 0.60, ModelTier.FAST, 1_000_000),
             CloudModel("gemini-2.5-pro", "Gemini 2.5 Pro", 1.25, 10.00, ModelTier.PRO, 1_000_000),
         )
     ),

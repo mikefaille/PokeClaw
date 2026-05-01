@@ -16,6 +16,8 @@ Priority: `P0` = blocks users, fix now. `P1` = next up. `P2` = when we get to it
 
 ## Features
 
+- [ ] **P2** Gemini native features (thinkingConfig): create a dedicated Google AI client mapping directly to `/v1beta/models/{model}:generateContent` instead of the OpenAI compatibility layer, in order to support native features like `thinkingBudget` for Gemini 3 models.
+
 - [ ] **P0** Missed-call auto follow-up: when a call is missed, let PokeClaw detect the missed-call event, send a follow-up message to that caller automatically, and keep the status visible in the same chatroom instead of as a hidden background-only action. Prefer SMS / true Android API paths first; do not make accessibility-driven WhatsApp automation the default design.
 - [x] ~~**P0** Production external automation intent: promote the debug-only task/chat broadcast into a user-enabled production API for Tasker, MacroDroid, Locale, and ADB-style callers. It should accept explicit package/component broadcasts with `task` / `chat` / base64 extras, preserve harness safety rules, and optionally return a result callback intent.~~ — implemented 2026-04-30; callback contract exists, Tasker/MacroDroid callback E2E remains a QA gap
 - [ ] **P1** Persistent global instructions: add a user-editable local instructions layer that applies to new tasks/conversations without becoming a prompt dump. It must be short, inspectable, removable, local-first, and separate from hard safety/tool rules.
