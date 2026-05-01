@@ -1383,3 +1383,10 @@ Format: `[date] [status] [test-id] description`
 | A11Y-r1 | Accessibility-dependent tools can false-fail during transient service rebinds | Fixed 2026-04-10: tools now wait for an enabled service to reconnect before returning `Accessibility service is not running` | Fixed |
 | Q7-local | ~~Stopping a Local task could crash with native `SIGSEGV` / `session already exists` race~~ | Fixed 2026-04-10: local cancel no longer interrupts LiteRT mid-send, and UI cleanup waits until the task-side client has closed cleanly | Fixed |
 | Bgt-1 | Existing installs could stay pinned to the legacy task budget even after code defaults increased | Fixed 2026-04-10: `TaskBudget` now one-time migrates untouched 100K / $0.50 legacy defaults to 250K / $1.00, while preserving explicit user overrides and exposing `250K` in Settings | Fixed |
+
+## Pre-Commit QA: Added new Gemini models
+
+- **Description**: Added support for Gemini 3.1 Pro Preview, Gemini 3 Flash Preview, and Gemini 3.1 Flash-Lite Preview models along with pricing details.
+- **Test ID**: CONFIG_01
+- **Status**: [PASS]
+- **Details**: Updated `CloudProvider.kt` and `ModelPricing.kt` to include the new models. Ran `./gradlew test` to ensure no regressions were introduced. Build completed successfully.
