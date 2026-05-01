@@ -75,8 +75,7 @@ public class OkHttpClientBuilderAdapter implements HttpClientBuilder {
         return this;
     }
 
-    @Override
-    public HttpClient build() {
+    public OkHttpClient buildOkHttpClient() {
         final boolean logReqBody = this.logRequestBody;
 
         // Custom interceptor: always print response; request body controlled by logRequestBody flag
@@ -135,7 +134,11 @@ public class OkHttpClientBuilderAdapter implements HttpClientBuilder {
             builder.addInterceptor(new FileLoggingInterceptor(cacheDir));
         }
 
-        OkHttpClient okHttpClient = builder.build();
-        return new OkHttpClientAdapter(okHttpClient);
+        return builder.build();
+    }
+
+    @Override
+    public HttpClient build() {
+        return new OkHttpClientAdapter(buildOkHttpClient());
     }
 }
