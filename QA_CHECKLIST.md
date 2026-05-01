@@ -1411,3 +1411,10 @@ Format: `[date] [status] [test-id] description`
 - **Test ID**: CONFIG_04
 - **Status**: [SKIP]
 - **Details**: Exposing native Gemini features such as `thinkingBudget` would require a dedicated native Google AI client or custom interceptor bypassing the Langchain4j OpenAI compatibility layer which is deeply integrated into PokeClaw's architecture. Modifying `OpenAiLlmClient` to inject Gemini-specific configurations into the OpenAI schema violates the API contracts on Google's OpenAI compatibility endpoint. No codebase modifications were made as this falls outside the immediate scope without a major architectural overhaul. Tests passed successfully.
+
+## Pre-Commit QA: Added Gemini native features to backlog
+
+- **Description**: Documented the missing Gemini native feature (thinkingConfig) as a P2 feature in `BACKLOG.md`.
+- **Test ID**: CONFIG_05
+- **Status**: [PASS]
+- **Details**: Added a new backlog entry indicating that a custom Google AI LLM client is needed instead of reusing the OpenAI compatibility layer in order to support Gemini 3 `thinkingBudget`.
