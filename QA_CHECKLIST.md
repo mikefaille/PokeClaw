@@ -1667,3 +1667,10 @@ Run on the actual GitHub release APK `PokeClaw_v0.7.0_20260526_101139.apk` after
 - **Test ID**: CONFIG_01
 - **Status**: [PASS]
 - **Details**: Updated `CloudProvider.kt` and `ModelPricing.kt` to include the new models. Ran `./gradlew test` to ensure no regressions were introduced. Build completed successfully.
+
+## Pre-Commit QA: Fixed context sizes for Gemini models
+
+- **Description**: Updated the context sizes of Gemini 3.1 Pro Preview, Gemini 3 Flash Preview, and Gemini 3.1 Flash-Lite Preview models to 1,000,000.
+- **Test ID**: CONFIG_02
+- **Status**: [PASS]
+- **Details**: Fixed the `CloudProvider.kt` context size values to match official limits and codebase patterns. Tests pass.
