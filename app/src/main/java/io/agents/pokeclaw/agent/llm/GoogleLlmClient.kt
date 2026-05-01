@@ -30,26 +30,38 @@ class GoogleLlmClient(
     httpClientBuilder: OkHttpClientBuilderAdapter
 ) : LlmClient {
 
+    companion object {
+        private const val TAG = "GoogleLlmClient"
+    }
+
     private val gson: Gson = GsonBuilder().create()
     private val httpClient: OkHttpClient = httpClientBuilder.buildOkHttpClient()
     private val mediaType = "application/json; charset=utf-8".toMediaType()
 
     override fun chat(messages: List<ChatMessage>, toolSpecs: List<ToolSpecification>): LlmResponse {
+        XLog.i(TAG, "chat: model=${config.modelName}, messages=${messages.size}, tools=${toolSpecs.size}")
         val requestJson = buildRequestBody(messages, toolSpecs)
         val url = buildUrl(streaming = false)
 
         val request = Request.Builder()
             .url(url)
+            .addHeader("x-goog-api-key", config.apiKey)
             .post(requestJson.toString().toRequestBody(mediaType))
             .build()
+
+        XLog.d(TAG, "Sending request to Gemini API: $url")
 
         httpClient.newCall(request).execute().use { response ->
             if (!response.isSuccessful) {
                 val errorBody = response.body?.string() ?: ""
+                XLog.e(TAG, "Google API error: code=${response.code} body=$errorBody")
                 throw RuntimeException("Google API error: ${response.code} $errorBody")
             }
 
-            val bodyStr = response.body?.string() ?: throw RuntimeException("Empty response body")
+            val bodyStr = response.body?.string() ?: run {
+                XLog.e(TAG, "Empty response body from Google API")
+                throw RuntimeException("Empty response body")
+            }
             return parseResponse(bodyStr)
         }
     }
@@ -59,19 +71,23 @@ class GoogleLlmClient(
         toolSpecs: List<ToolSpecification>,
         listener: StreamingListener
     ): LlmResponse {
+        XLog.i(TAG, "chatStreaming: model=${config.modelName}, messages=${messages.size}, tools=${toolSpecs.size}")
         val requestJson = buildRequestBody(messages, toolSpecs)
         val url = buildUrl(streaming = true)
 
         val request = Request.Builder()
             .url(url)
+            .addHeader("x-goog-api-key", config.apiKey)
             .post(requestJson.toString().toRequestBody(mediaType))
             .build()
 
-        var finalResponse: LlmResponse? = null
+        XLog.d(TAG, "Sending streaming request to Gemini API: $url")
+
         try {
             httpClient.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) {
                     val errorBody = response.body?.string() ?: ""
+                    XLog.e(TAG, "Google API streaming error: code=${response.code} body=$errorBody")
                     throw RuntimeException("Google API streaming error: ${response.code} $errorBody")
                 }
 
@@ -90,68 +106,40 @@ class GoogleLlmClient(
 
                         try {
                             val chunk = gson.fromJson(data, JsonObject::class.java)
-                            val candidates = chunk.getAsJsonArray("candidates")
-                            if (candidates != null && candidates.size() > 0) {
-                                val candidate = candidates[0].asJsonObject
-                                val content = candidate.getAsJsonObject("content")
-                                if (content != null) {
-                                    val parts = content.getAsJsonArray("parts")
-                                    if (parts != null) {
-                                        for (i in 0 until parts.size()) {
-                                            val part = parts[i].asJsonObject
-                                            if (part.has("text")) {
-                                                val textToken = part.get("text").asString
-                                                accumulatedText += textToken
-                                                listener.onPartialText(textToken)
-                                            } else if (part.has("functionCall")) {
-                                                val funcCall = part.getAsJsonObject("functionCall")
-                                                val name = funcCall.get("name").asString
-                                                val args = if (funcCall.has("args")) gson.toJson(funcCall.getAsJsonObject("args")) else "{}"
-                                                toolExecutionRequests.add(ToolExecutionRequest.builder()
-                                                    .id("call_" + System.currentTimeMillis() + "_" + i)
-                                                    .name(name)
-                                                    .arguments(args)
-                                                    .build())
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-
-                            val usageMetadata = chunk.getAsJsonObject("usageMetadata")
-                            if (usageMetadata != null) {
-                                val promptTokens = if (usageMetadata.has("promptTokenCount")) usageMetadata.get("promptTokenCount").asInt else 0
-                                val completionTokens = if (usageMetadata.has("candidatesTokenCount")) usageMetadata.get("candidatesTokenCount").asInt else 0
-                                val totalTokens = if (usageMetadata.has("totalTokenCount")) usageMetadata.get("totalTokenCount").asInt else 0
-                                tokenUsage = TokenUsage(promptTokens, completionTokens, totalTokens)
+                            val parsed = parseCandidates(chunk, listener)
+                            accumulatedText += parsed.text
+                            toolExecutionRequests.addAll(parsed.toolExecutionRequests)
+                            if (parsed.tokenUsage != null) {
+                                tokenUsage = parsed.tokenUsage
                             }
                         } catch (e: Exception) {
-                            XLog.w("GoogleLlmClient", "Error parsing chunk: $e")
+                            XLog.w(TAG, "Error parsing chunk: $e")
                         }
                     }
                 }
 
-                finalResponse = LlmResponse(
+                val response = LlmResponse(
                     text = accumulatedText,
                     toolExecutionRequests = toolExecutionRequests,
                     tokenUsage = tokenUsage,
                     modelName = config.modelName
                 )
-                listener.onComplete(finalResponse!!)
+                listener.onComplete(response)
+                return response
             }
         } catch (e: Exception) {
             listener.onError(e)
             throw e
         }
 
-        return finalResponse ?: LlmResponse("", emptyList(), null, config.modelName)
+        throw RuntimeException("Unreachable code")
     }
 
     private fun buildUrl(streaming: Boolean): String {
         val baseUrl = config.baseUrl.ifEmpty { "https://generativelanguage.googleapis.com/v1beta" }.trimEnd('/')
         val model = config.modelName.ifEmpty { "gemini-3.1-pro-preview" }
-        val method = if (streaming) "streamGenerateContent?alt=sse&key=" else "generateContent?key="
-        return "$baseUrl/models/$model:$method${config.apiKey}"
+        val method = if (streaming) "streamGenerateContent?alt=sse" else "generateContent"
+        return "$baseUrl/models/$model:$method"
     }
 
     private fun buildRequestBody(messages: List<ChatMessage>, toolSpecs: List<ToolSpecification>): JsonObject {
@@ -201,6 +189,7 @@ class GoogleLlmClient(
                             val argsObj = try {
                                 gson.fromJson(req.arguments(), JsonObject::class.java)
                             } catch (e: Exception) {
+                                XLog.w(TAG, "Failed to parse tool arguments for ${req.name()}: ${req.arguments()}", e)
                                 JsonObject()
                             }
                             funcCall.add("args", argsObj)
@@ -210,7 +199,7 @@ class GoogleLlmClient(
                     }
                 }
                 is ToolExecutionResultMessage -> {
-                    content.addProperty("role", "function")
+                    content.addProperty("role", "user")
                     val part = JsonObject()
                     val funcResp = JsonObject()
                     funcResp.addProperty("name", msg.toolName())
@@ -310,14 +299,18 @@ class GoogleLlmClient(
         return root
     }
 
-    private fun parseResponse(bodyStr: String): LlmResponse {
-        val root = gson.fromJson(bodyStr, JsonObject::class.java)
-        val candidates = root.getAsJsonArray("candidates")
+private data class ParsedContent(
+        val text: String,
+        val toolExecutionRequests: List<ToolExecutionRequest>,
+        val tokenUsage: TokenUsage?
+    )
 
+    private fun parseCandidates(root: JsonObject, listener: StreamingListener? = null): ParsedContent {
         var text = ""
         val toolExecutionRequests = mutableListOf<ToolExecutionRequest>()
         var tokenUsage: TokenUsage? = null
 
+        val candidates = root.getAsJsonArray("candidates")
         if (candidates != null && candidates.size() > 0) {
             val candidate = candidates[0].asJsonObject
             val content = candidate.getAsJsonObject("content")
@@ -327,13 +320,16 @@ class GoogleLlmClient(
                     for (i in 0 until parts.size()) {
                         val part = parts[i].asJsonObject
                         if (part.has("text")) {
-                            text += part.get("text").asString
+                            val textToken = part.get("text").asString
+                            text += textToken
+                            listener?.onPartialText(textToken)
                         } else if (part.has("functionCall")) {
                             val funcCall = part.getAsJsonObject("functionCall")
                             val name = funcCall.get("name").asString
+                            val id = if (funcCall.has("id")) funcCall.get("id").asString else "call_" + System.currentTimeMillis() + "_" + i
                             val args = if (funcCall.has("args")) gson.toJson(funcCall.getAsJsonObject("args")) else "{}"
                             toolExecutionRequests.add(ToolExecutionRequest.builder()
-                                .id("call_" + System.currentTimeMillis() + "_" + i)
+                                .id(id)
                                 .name(name)
                                 .arguments(args)
                                 .build())
@@ -351,10 +347,16 @@ class GoogleLlmClient(
             tokenUsage = TokenUsage(promptTokens, completionTokens, totalTokens)
         }
 
+        return ParsedContent(text, toolExecutionRequests, tokenUsage)
+    }
+
+    private fun parseResponse(bodyStr: String): LlmResponse {
+        val root = gson.fromJson(bodyStr, JsonObject::class.java)
+        val parsed = parseCandidates(root)
         return LlmResponse(
-            text = text,
-            toolExecutionRequests = toolExecutionRequests,
-            tokenUsage = tokenUsage,
+            text = parsed.text,
+            toolExecutionRequests = parsed.toolExecutionRequests,
+            tokenUsage = parsed.tokenUsage,
             modelName = config.modelName
         )
     }

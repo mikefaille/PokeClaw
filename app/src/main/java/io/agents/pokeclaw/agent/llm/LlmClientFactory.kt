@@ -19,6 +19,7 @@ object LlmClientFactory {
         return when (config.provider) {
             LlmProvider.OPENAI -> OpenAiLlmClient(config, httpClientBuilder)
             LlmProvider.ANTHROPIC -> AnthropicLlmClient(config, httpClientBuilder)
+            LlmProvider.GOOGLE -> GoogleLlmClient(config, httpClientBuilder)
             LlmProvider.LOCAL -> LocalLlmClient(config)
         }
     }

@@ -52,6 +52,7 @@ object LlmSessionManager {
                 .temperature(temperature)
                 .build()
 
+            io.agents.pokeclaw.agent.LlmProvider.GOOGLE -> throw RuntimeException("LangChain4j ChatModel not supported for GOOGLE provider, use LlmClient instead")
             else -> OpenAiChatModel.builder()
                 .httpClientBuilder(OkHttpClientBuilderAdapter())
                 .apiKey(cloud.apiKey)

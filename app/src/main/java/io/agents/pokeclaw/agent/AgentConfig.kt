@@ -3,7 +3,7 @@
 
 package io.agents.pokeclaw.agent
 
-enum class LlmProvider { OPENAI, ANTHROPIC, LOCAL }
+enum class LlmProvider { OPENAI, ANTHROPIC, GOOGLE, LOCAL }
 
 data class AgentConfig(
     val apiKey: String,
@@ -13,7 +13,8 @@ data class AgentConfig(
     val maxIterations: Int = 60,
     val temperature: Double = 0.1,
     val provider: LlmProvider = LlmProvider.OPENAI,
-    val streaming: Boolean = false
+    val streaming: Boolean = false,
+    val thinkingBudget: Int? = null
 ) {
     companion object {
         const val DEFAULT_SYSTEM_PROMPT =
@@ -184,6 +185,7 @@ Steps:
         private var temperature: Double = 0.1
         private var provider: LlmProvider = LlmProvider.OPENAI
         private var streaming: Boolean = false
+        private var thinkingBudget: Int? = null
 
         fun apiKey(apiKey: String) = apply { this.apiKey = apiKey }
         fun baseUrl(baseUrl: String) = apply { this.baseUrl = baseUrl }
@@ -193,12 +195,13 @@ Steps:
         fun temperature(temperature: Double) = apply { this.temperature = temperature }
         fun provider(provider: LlmProvider) = apply { this.provider = provider }
         fun streaming(streaming: Boolean) = apply { this.streaming = streaming }
+        fun thinkingBudget(thinkingBudget: Int?) = apply { this.thinkingBudget = thinkingBudget }
 
         fun build(): AgentConfig {
             require(apiKey.isNotEmpty() || baseUrl.isNotEmpty()) {
                 "Either API key or base URL is required"
             }
-            return AgentConfig(apiKey, baseUrl, modelName, systemPrompt, maxIterations, temperature, provider, streaming)
+            return AgentConfig(apiKey, baseUrl, modelName, systemPrompt, maxIterations, temperature, provider, streaming, thinkingBudget)
         }
     }
 }
