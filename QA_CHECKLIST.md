@@ -1404,3 +1404,10 @@ Format: `[date] [status] [test-id] description`
 - **Test ID**: CONFIG_03
 - **Status**: [SKIP]
 - **Details**: Gemini 3 features like `thinkingBudget` are exposed via Google's SDK/REST API. PokeClaw accesses these models through Langchain4j's `OpenAiChatModel` which provides OpenAI API compatibility. Because the OpenAI compatibility proxy doesn't support Google-specific `thinkingConfig` parameters, this feature cannot be natively integrated without altering the architecture to use a dedicated Google AI client or waiting for upstream proxy support. No code changes were made. Tests passed successfully.
+
+## Pre-Commit QA: Gemini Native Features Evaluation
+
+- **Description**: Re-evaluated the request to expose native Gemini features (like `thinkingConfig`).
+- **Test ID**: CONFIG_04
+- **Status**: [SKIP]
+- **Details**: Exposing native Gemini features such as `thinkingBudget` would require a dedicated native Google AI client or custom interceptor bypassing the Langchain4j OpenAI compatibility layer which is deeply integrated into PokeClaw's architecture. Modifying `OpenAiLlmClient` to inject Gemini-specific configurations into the OpenAI schema violates the API contracts on Google's OpenAI compatibility endpoint. No codebase modifications were made as this falls outside the immediate scope without a major architectural overhaul. Tests passed successfully.
