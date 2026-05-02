@@ -104,16 +104,7 @@ class GeminiCloudProvider(
                 if (propertiesMap != null && propertiesMap.isNotEmpty()) {
                     val convertedProperties = mutableMapOf<String, Schema>()
                     for ((key, propSchema) in propertiesMap) {
-                        val typeName = propSchema.javaClass.simpleName
-                        val geminiType = when {
-                            typeName.contains("String") -> "STRING"
-                            typeName.contains("Integer") -> "INTEGER"
-                            typeName.contains("Number") -> "NUMBER"
-                            typeName.contains("Boolean") -> "BOOLEAN"
-                            typeName.contains("Array") -> "ARRAY"
-                            typeName.contains("Object") -> "OBJECT"
-                            else -> "STRING"
-                        }
+                        val geminiType = propSchema.type().uppercase()
 
                         val description = try {
                             val descMethod = propSchema.javaClass.getMethod("description")
