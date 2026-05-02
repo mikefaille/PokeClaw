@@ -52,7 +52,9 @@ class GeminiCloudProvider(
             }
 
             if (currentRole != null && currentRole != msgRole) {
-                contents.add(Content.builder().role(currentRole).parts(currentParts).build())
+                if (currentParts.isNotEmpty()) {
+                    contents.add(Content.builder().role(currentRole).parts(currentParts).build())
+                }
                 currentParts = mutableListOf<Part>()
             }
             currentRole = msgRole
@@ -126,12 +128,13 @@ class GeminiCloudProvider(
                         } catch (e: Exception) {
                             val typeName = propSchema.javaClass.simpleName
                             when {
-                                typeName.contains("String") -> "STRING"
-                                typeName.contains("Integer") -> "INTEGER"
-                                typeName.contains("Number") -> "NUMBER"
-                                typeName.contains("Boolean") -> "BOOLEAN"
-                                typeName.contains("Array") -> "ARRAY"
-                                typeName.contains("Object") -> "OBJECT"
+                                typeName == "JsonStringSchemaProperty" -> "STRING"
+                                typeName == "JsonIntegerSchemaProperty" -> "INTEGER"
+                                typeName == "JsonNumberSchemaProperty" -> "NUMBER"
+                                typeName == "JsonBooleanSchemaProperty" -> "BOOLEAN"
+                                typeName == "JsonArraySchemaProperty" -> "ARRAY"
+                                typeName == "JsonObjectSchemaProperty" -> "OBJECT"
+                                typeName == "JsonEnumSchemaProperty" -> "STRING"
                                 else -> "STRING"
                             }
                         }
