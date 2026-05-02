@@ -161,39 +161,25 @@ class GoogleLlmClient(
 
         // 2. Messages
         val contents = JsonArray()
-        var currentRole: String? = null
-        var currentParts = JsonArray()
-
         for (msg in messages) {
             if (msg is SystemMessage) continue
 
-            val msgRole = when (msg) {
-                is UserMessage -> "user"
-                is AiMessage -> "model"
-                is ToolExecutionResultMessage -> "user"
-                else -> "user"
-            }
-
-            if (currentRole != null && currentRole != msgRole) {
-                val content = JsonObject()
-                content.addProperty("role", currentRole)
-                content.add("parts", currentParts)
-                contents.add(content)
-                currentParts = JsonArray()
-            }
-            currentRole = msgRole
+            val content = JsonObject()
+            val parts = JsonArray()
 
             when (msg) {
                 is UserMessage -> {
+                    content.addProperty("role", "user")
                     val part = JsonObject()
                     part.addProperty("text", msg.singleText())
-                    currentParts.add(part)
+                    parts.add(part)
                 }
                 is AiMessage -> {
+                    content.addProperty("role", "model")
                     if (msg.text() != null && msg.text().isNotEmpty()) {
                         val part = JsonObject()
                         part.addProperty("text", msg.text())
-                        currentParts.add(part)
+                        parts.add(part)
                     }
                     if (msg.toolExecutionRequests() != null) {
                         for (req in msg.toolExecutionRequests()) {
@@ -208,11 +194,12 @@ class GoogleLlmClient(
                             }
                             funcCall.add("args", argsObj)
                             part.add("functionCall", funcCall)
-                            currentParts.add(part)
+                            parts.add(part)
                         }
                     }
                 }
                 is ToolExecutionResultMessage -> {
+                    content.addProperty("role", "user")
                     val part = JsonObject()
                     val funcResp = JsonObject()
                     funcResp.addProperty("name", msg.toolName())
@@ -220,18 +207,12 @@ class GoogleLlmClient(
                     responseBody.addProperty("result", msg.text())
                     funcResp.add("response", responseBody)
                     part.add("functionResponse", funcResp)
-                    currentParts.add(part)
+                    parts.add(part)
                 }
             }
-        }
-
-        if (currentRole != null) {
-            val content = JsonObject()
-            content.addProperty("role", currentRole)
-            content.add("parts", currentParts)
+            content.add("parts", parts)
             contents.add(content)
         }
-
         root.add("contents", contents)
 
         // 3. Tools
