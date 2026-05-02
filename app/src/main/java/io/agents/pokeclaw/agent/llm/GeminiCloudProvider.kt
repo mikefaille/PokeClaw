@@ -76,25 +76,37 @@ class GeminiCloudProvider(
                             } catch (e: Exception) {
                                 emptyMap<String, Any>()
                             }
-                            currentParts.add(
-                                Part.builder().functionCall(
-                                    FunctionCall.builder()
-                                        .name(req.name())
-                                        .args(argsMap)
-                                        .build()
-                                ).build()
-                            )
+                            val rawId = req.id() ?: ""
+                            val parts = rawId.split("|", limit = 2)
+                            val callId = parts[0]
+                            val tsBase64 = if (parts.size > 1) parts[1] else null
+                            
+                            val fcBuilder = FunctionCall.builder()
+                                .name(req.name())
+                                .args(argsMap)
+                            if (callId.isNotEmpty()) {
+                                fcBuilder.id(callId)
+                            }
+                            val partBuilder = Part.builder().functionCall(fcBuilder.build())
+                            if (tsBase64 != null) {
+                                partBuilder.thoughtSignature(java.util.Base64.getDecoder().decode(tsBase64))
+                            }
+                            currentParts.add(partBuilder.build())
                         }
                     }
                 }
                 is ToolExecutionResultMessage -> {
+                    val rawId = msg.id() ?: ""
+                    val parts = rawId.split("|", limit = 2)
+                    val callId = parts[0]
+                    val frBuilder = FunctionResponse.builder()
+                        .name(msg.toolName())
+                        .response(mapOf("result" to msg.text()))
+                    if (callId.isNotEmpty()) {
+                        frBuilder.id(callId)
+                    }
                     currentParts.add(
-                        Part.builder().functionResponse(
-                            FunctionResponse.builder()
-                                .name(msg.toolName())
-                                .response(mapOf("result" to msg.text()))
-                                .build()
-                        ).build()
+                        Part.builder().functionResponse(frBuilder.build()).build()
                     )
                 }
             }
@@ -272,8 +284,15 @@ class GeminiCloudProvider(
                                 val argsJson = if (argsMap != null) gson.toJson(argsMap) else "{}"
                                 val nameOpt = funcCall.name()
                                 val name = if (nameOpt != null && nameOpt.isPresent()) nameOpt.get() else ""
+                                
+                                val tsOpt = part.thoughtSignature()
+                                val tsBase64 = if (tsOpt != null && tsOpt.isPresent()) java.util.Base64.getEncoder().encodeToString(tsOpt.get()) else null
+                                val callIdOpt = funcCall.id()
+                                val callId = if (callIdOpt != null && callIdOpt.isPresent()) callIdOpt.get() else "call_" + System.currentTimeMillis()
+                                val compositeId = if (tsBase64 != null) "$callId|$tsBase64" else callId
+
                                 val request = ToolExecutionRequest.builder()
-                                    .id("call_" + System.currentTimeMillis())
+                                    .id(compositeId)
                                     .name(name)
                                     .arguments(argsJson)
                                     .build()
