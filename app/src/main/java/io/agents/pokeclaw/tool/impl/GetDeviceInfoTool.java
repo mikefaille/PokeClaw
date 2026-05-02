@@ -171,6 +171,7 @@ public class GetDeviceInfoTool extends BaseTool {
         sb.append("Bluetooth: enabled");
 
         try {
+            @SuppressWarnings("MissingPermission")
             Set<BluetoothDevice> bonded = adapter.getBondedDevices();
             if (bonded != null && !bonded.isEmpty()) {
                 sb.append(", paired devices: ");
