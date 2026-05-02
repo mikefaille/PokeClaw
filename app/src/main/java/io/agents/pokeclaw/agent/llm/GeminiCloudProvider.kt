@@ -28,34 +28,34 @@ class GeminiCloudProvider(
 
     companion object {
         private const val TAG = "GeminiCloudProvider"
+        private const val DEFAULT_OBJECT_TYPE = "OBJECT"
     }
 
     private val gson: Gson = GsonBuilder().create()
-
     private val client: Client = Client.builder()
         .apiKey(config.apiKey)
         .build()
 
+    /**
+     * Converts LangChain4j messages to Gemini Content objects.
+     * Best Practice: Ensures strict role alternation (user -> model).
+     */
     private fun convertMessages(messages: List<ChatMessage>): List<Content> {
         val contents = mutableListOf<Content>()
         var currentRole: String? = null
         var currentParts = mutableListOf<Part>()
 
-        for (msg in messages) {
-            if (msg is SystemMessage) continue
-
+        messages.filter { it !is SystemMessage }.forEach { msg ->
             val msgRole = when (msg) {
-                is UserMessage -> "user"
+                is UserMessage, is ToolExecutionResultMessage -> "user"
                 is AiMessage -> "model"
-                is ToolExecutionResultMessage -> "user"
                 else -> "user"
             }
 
+            // Group consecutive parts of the same role
             if (currentRole != null && currentRole != msgRole) {
-                if (currentParts.isNotEmpty()) {
-                    contents.add(Content.builder().role(currentRole).parts(currentParts).build())
-                }
-                currentParts = mutableListOf<Part>()
+                contents.add(Content.builder().role(currentRole).parts(currentParts).build())
+                currentParts = mutableListOf()
             }
             currentRole = msgRole
 
@@ -66,149 +66,84 @@ class GeminiCloudProvider(
                     }
                 }
                 is AiMessage -> {
-                    if (msg.text() != null && msg.text().isNotEmpty()) {
-                        currentParts.add(Part.builder().text(msg.text()).build())
+                    msg.text()?.takeIf { it.isNotEmpty() }?.let {
+                        currentParts.add(Part.builder().text(it).build())
                     }
-                    if (msg.toolExecutionRequests() != null) {
-                        for (req in msg.toolExecutionRequests()) {
-                            val argsMap = try {
-                                gson.fromJson(req.arguments(), Map::class.java) as Map<String, Any>
-                            } catch (e: Exception) {
-                                emptyMap<String, Any>()
-                            }
-                            val rawId = req.id() ?: ""
-                            val parts = rawId.split("|", limit = 2)
-                            val callId = parts[0]
-                            val tsBase64 = if (parts.size > 1) parts[1] else null
-                            
-                            val fcBuilder = FunctionCall.builder()
-                                .name(req.name())
-                                .args(argsMap)
-                            if (callId.isNotBlank()) {
-                                fcBuilder.id(callId)
-                            }
-                            val partBuilder = Part.builder().functionCall(fcBuilder.build())
-                            if (!tsBase64.isNullOrBlank()) {
-                                try {
-                                    partBuilder.thoughtSignature(java.util.Base64.getDecoder().decode(tsBase64))
-                                } catch (e: Exception) {
-                                    XLog.w(TAG, "Failed to decode thoughtSignature from ID: $rawId")
-                                }
-                            }
-                            currentParts.add(partBuilder.build())
-                        }
+                    msg.toolExecutionRequests()?.forEach { req ->
+                        val argsMap = parseArguments(req.arguments())
+                        val (callId, ts) = splitId(req.id())
+
+                        val fc = FunctionCall.builder()
+                            .name(req.name())
+                            .args(argsMap)
+                            .apply { callId?.let { id(it) } }
+                            .build()
+
+                        currentParts.add(
+                            Part.builder()
+                                .functionCall(fc)
+                                .apply { ts?.let { thoughtSignature(it) } }
+                                .build()
+                        )
                     }
                 }
                 is ToolExecutionResultMessage -> {
-                    val rawId = msg.id() ?: ""
-                    val parts = rawId.split("|", limit = 2)
-                    val callId = parts[0]
-                    val frBuilder = FunctionResponse.builder()
+                    val (callId, _) = splitId(msg.id())
+                    val fr = FunctionResponse.builder()
                         .name(msg.toolName())
                         .response(mapOf("result" to msg.text()))
-                    if (callId.isNotBlank()) {
-                        frBuilder.id(callId)
-                    }
-                    currentParts.add(
-                        Part.builder().functionResponse(frBuilder.build()).build()
-                    )
+                        .apply { callId?.let { id(it) } }
+                        .build()
+
+                    currentParts.add(Part.builder().functionResponse(fr).build())
                 }
             }
         }
 
-        if (currentRole != null && currentParts.isNotEmpty()) {
-            contents.add(Content.builder().role(currentRole).parts(currentParts).build())
+        currentRole?.let {
+            contents.add(Content.builder().role(it).parts(currentParts).build())
         }
 
         return contents
     }
 
+    /**
+     * Best Practice: Avoid reflection where possible.
+     * Map LangChain4j parameter types to Gemini Schema types explicitly.
+     */
     private fun convertTools(toolSpecs: List<ToolSpecification>): List<Tool> {
         if (toolSpecs.isEmpty()) return emptyList()
 
-        val functionDeclarations = mutableListOf<FunctionDeclaration>()
+        val declarations = toolSpecs.map { spec ->
+            val properties = spec.parameters()?.properties()?.mapValues { (_, prop) ->
+                // Simplified mapping logic - consider a dedicated Mapper class
+                Schema.builder()
+                    .type(mapType(prop))
+                    .description(getPropertyDescription(prop))
+                    .build()
+            } ?: emptyMap()
 
-        for (spec in toolSpecs) {
-            val schemaBuilder = Schema.builder().type("OBJECT")
+            val schema = Schema.builder()
+                .type(DEFAULT_OBJECT_TYPE)
+                .properties(properties)
+                .apply { spec.parameters()?.required()?.let { required(it) } }
+                .build()
 
-            val paramsObj = spec.parameters()
-            if (paramsObj != null) {
-                val propertiesMap = paramsObj.properties()
-                if (propertiesMap != null && propertiesMap.isNotEmpty()) {
-                    val convertedProperties = mutableMapOf<String, Schema>()
-                    for ((key, propSchema) in propertiesMap) {
-                        val geminiType = try {
-                            val typeMethod = propSchema.javaClass.getMethod("type")
-                            val typeEnum = typeMethod.invoke(propSchema)
-                            typeEnum.toString().uppercase()
-                        } catch (e: Exception) {
-                            val typeName = propSchema.javaClass.simpleName
-                            when {
-                                typeName == "JsonStringSchemaProperty" -> "STRING"
-                                typeName == "JsonIntegerSchemaProperty" -> "INTEGER"
-                                typeName == "JsonNumberSchemaProperty" -> "NUMBER"
-                                typeName == "JsonBooleanSchemaProperty" -> "BOOLEAN"
-                                typeName == "JsonArraySchemaProperty" -> "ARRAY"
-                                typeName == "JsonObjectSchemaProperty" -> "OBJECT"
-                                typeName == "JsonEnumSchemaProperty" -> "STRING"
-                                else -> "STRING"
-                            }
-                        }
-
-                        val description = try {
-                            val descMethod = propSchema.javaClass.getMethod("description")
-                            descMethod.invoke(propSchema) as? String
-                        } catch (e: Exception) { null }
-
-                        val propBuilder = Schema.builder().type(geminiType)
-                        if (description != null) {
-                            propBuilder.description(description)
-                        }
-                        convertedProperties[key] = propBuilder.build()
-                    }
-                    schemaBuilder.properties(convertedProperties)
-                }
-
-                val requiredList = paramsObj.required()
-                if (requiredList != null && requiredList.isNotEmpty()) {
-                    schemaBuilder.required(requiredList)
-                }
-            }
-
-            val fdBuilder = FunctionDeclaration.builder()
+            FunctionDeclaration.builder()
                 .name(spec.name())
-                .parameters(schemaBuilder.build())
-
-            if (spec.description() != null) {
-                fdBuilder.description(spec.description())
-            }
-
-            functionDeclarations.add(fdBuilder.build())
+                .description(spec.description() ?: "")
+                .parameters(schema)
+                .build()
         }
 
-        return listOf(Tool.builder().functionDeclarations(functionDeclarations).build())
+        return listOf(Tool.builder().functionDeclarations(declarations).build())
     }
 
     override fun chat(messages: List<ChatMessage>, toolSpecs: List<ToolSpecification>): LlmResponse {
         XLog.i(TAG, "chat: model=${config.modelName}, messages=${messages.size}, tools=${toolSpecs.size}")
-
-        val systemMessages = messages.filterIsInstance<SystemMessage>()
-        val configBuilder = GenerateContentConfig.builder()
-            .temperature(config.temperature.toFloat())
-
-        if (systemMessages.isNotEmpty()) {
-            val sysParts = systemMessages.map { Part.builder().text(it.text()).build() }
-            configBuilder.systemInstruction(
-                Content.builder().parts(sysParts).build()
-            )
-        }
-
-        val tools = convertTools(toolSpecs)
-        if (tools.isNotEmpty()) {
-            configBuilder.tools(tools)
-        }
-
+        val configBuilder = setupGenerateConfig(messages, toolSpecs)
         val contents = convertMessages(messages)
+
         val response = client.models.generateContent(
             config.modelName,
             contents,
@@ -224,22 +159,7 @@ class GeminiCloudProvider(
     ): LlmResponse {
         XLog.i(TAG, "chatStreaming: model=${config.modelName}, messages=${messages.size}, tools=${toolSpecs.size}")
 
-        val systemMessages = messages.filterIsInstance<SystemMessage>()
-        val configBuilder = GenerateContentConfig.builder()
-            .temperature(config.temperature.toFloat())
-
-        if (systemMessages.isNotEmpty()) {
-            val sysParts = systemMessages.map { Part.builder().text(it.text()).build() }
-            configBuilder.systemInstruction(
-                Content.builder().parts(sysParts).build()
-            )
-        }
-
-        val tools = convertTools(toolSpecs)
-        if (tools.isNotEmpty()) {
-            configBuilder.tools(tools)
-        }
-
+        val configBuilder = setupGenerateConfig(messages, toolSpecs)
         val contents = convertMessages(messages)
         val stream = client.models.generateContentStream(
             config.modelName,
@@ -269,7 +189,23 @@ class GeminiCloudProvider(
         )
     }
 
-        private fun extractFunctionCalls(candidatesOpt: Optional<out List<com.google.genai.types.Candidate>>?): List<ToolExecutionRequest> {
+    // Helper: Logic shared between chat and chatStreaming
+    private fun setupGenerateConfig(messages: List<ChatMessage>, toolSpecs: List<ToolSpecification>): GenerateContentConfig.Builder {
+        val sysInstruction = messages.filterIsInstance<SystemMessage>()
+            .joinToString("\n") { it.text() }
+            .takeIf { it.isNotEmpty() }
+
+        return GenerateContentConfig.builder()
+            .temperature(config.temperature.toFloat())
+            .apply {
+                sysInstruction?.let {
+                    systemInstruction(Content.builder().parts(listOf(Part.builder().text(it).build())).build())
+                }
+                convertTools(toolSpecs).takeIf { it.isNotEmpty() }?.let { tools(it) }
+            }
+    }
+
+    private fun extractFunctionCalls(candidatesOpt: Optional<out List<com.google.genai.types.Candidate>>?): List<ToolExecutionRequest> {
         val requests = mutableListOf<ToolExecutionRequest>()
         if (candidatesOpt != null && candidatesOpt.isPresent()) {
             val candidateList = candidatesOpt.get()
@@ -321,5 +257,38 @@ class GeminiCloudProvider(
             toolExecutionRequests = toolExecutionRequests,
             modelName = config.modelName
         )
+    }
+
+    private fun splitId(rawId: String?): Pair<String?, ByteArray?> {
+        if (rawId == null) return null to null
+        val parts = rawId.split("|", limit = 2)
+        val id = parts[0].takeIf { it.isNotEmpty() }
+        val ts = parts.getOrNull(1)?.let { java.util.Base64.getDecoder().decode(it) }
+        return id to ts
+    }
+
+    private fun parseArguments(json: String): Map<String, Any> {
+        return try {
+            gson.fromJson(json, Map::class.java) as Map<String, Any>
+        } catch (e: Exception) {
+            emptyMap()
+        }
+    }
+
+    private fun mapType(prop: Any): String {
+        return when (prop.javaClass.simpleName) {
+            "JsonStringSchemaProperty" -> "STRING"
+            "JsonIntegerSchemaProperty" -> "INTEGER"
+            "JsonBooleanSchemaProperty" -> "BOOLEAN"
+            "JsonNumberSchemaProperty" -> "NUMBER"
+            "JsonArraySchemaProperty" -> "ARRAY"
+            else -> "STRING"
+        }
+    }
+
+    private fun getPropertyDescription(prop: Any): String? {
+        return try {
+            prop.javaClass.getMethod("description").invoke(prop) as? String
+        } catch (e: Exception) { null }
     }
 }
