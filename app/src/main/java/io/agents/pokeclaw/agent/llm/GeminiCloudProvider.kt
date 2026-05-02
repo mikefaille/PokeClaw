@@ -20,7 +20,6 @@ import com.google.genai.types.Schema
 import com.google.genai.types.GenerateContentConfig
 import com.google.genai.types.GenerateContentResponse
 import io.agents.pokeclaw.utils.XLog
-import com.google.genai.types.Type
 import java.util.Optional
 
 class GeminiCloudProvider(
@@ -120,15 +119,21 @@ class GeminiCloudProvider(
                 if (propertiesMap != null && propertiesMap.isNotEmpty()) {
                     val convertedProperties = mutableMapOf<String, Schema>()
                     for ((key, propSchema) in propertiesMap) {
-                        val typeName = propSchema.javaClass.simpleName
-                        val geminiType = when {
-                            typeName.contains("String") -> "STRING"
-                            typeName.contains("Integer") -> "INTEGER"
-                            typeName.contains("Number") -> "NUMBER"
-                            typeName.contains("Boolean") -> "BOOLEAN"
-                            typeName.contains("Array") -> "ARRAY"
-                            typeName.contains("Object") -> "OBJECT"
-                            else -> "STRING"
+                        val geminiType = try {
+                            val typeMethod = propSchema.javaClass.getMethod("type")
+                            val typeEnum = typeMethod.invoke(propSchema)
+                            typeEnum.toString().uppercase()
+                        } catch (e: Exception) {
+                            val typeName = propSchema.javaClass.simpleName
+                            when {
+                                typeName.contains("String") -> "STRING"
+                                typeName.contains("Integer") -> "INTEGER"
+                                typeName.contains("Number") -> "NUMBER"
+                                typeName.contains("Boolean") -> "BOOLEAN"
+                                typeName.contains("Array") -> "ARRAY"
+                                typeName.contains("Object") -> "OBJECT"
+                                else -> "STRING"
+                            }
                         }
 
                         val description = try {
