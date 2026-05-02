@@ -207,7 +207,7 @@ class GeminiCloudProvider(
             configBuilder.build()
         )
 
-        var fullText = ""
+        val fullTextBuilder = StringBuilder()
         val allToolExecutionRequests = mutableListOf<ToolExecutionRequest>()
 
         val chunkIter = stream.iterator()
@@ -215,54 +215,22 @@ class GeminiCloudProvider(
             val chunk = chunkIter.next()
             val chunkText = chunk.text()
             if (!chunkText.isNullOrEmpty()) {
-                fullText += chunkText
+                fullTextBuilder.append(chunkText)
                 listener.onPartialText(chunkText)
             }
 
-            val candidatesOpt = chunk.candidates()
-            if (candidatesOpt != null && candidatesOpt.isPresent()) {
-                val candidateList = candidatesOpt.get()
-                if (candidateList.isNotEmpty()) {
-                    val contentOpt = candidateList[0].content()
-                    if (contentOpt != null && contentOpt.isPresent()) {
-                        val content = contentOpt.get()
-                        val partsOpt = content.parts()
-                        if (partsOpt != null && partsOpt.isPresent()) {
-                            for (part in partsOpt.get()) {
-                                val funcCallOpt = part.functionCall()
-                                if (funcCallOpt != null && funcCallOpt.isPresent()) {
-                                    val funcCall = funcCallOpt.get()
-                                    val argsMapOpt = funcCall.args()
-                                    val argsMap = if (argsMapOpt != null && argsMapOpt.isPresent()) argsMapOpt.get() else null
-                                    val argsJson = if (argsMap != null) gson.toJson(argsMap) else "{}"
-                                    val nameOpt = funcCall.name()
-                                    val name = if (nameOpt != null && nameOpt.isPresent()) nameOpt.get() else ""
-                                    val request = ToolExecutionRequest.builder()
-                                        .id("call_" + System.currentTimeMillis())
-                                        .name(name)
-                                        .arguments(argsJson)
-                                        .build()
-                                    allToolExecutionRequests.add(request)
-                                }
-                            }
-                        }
-                    }
-                }
-            }
+            allToolExecutionRequests.addAll(extractFunctionCalls(chunk.candidates()))
         }
 
         return LlmResponse(
-            text = fullText,
+            text = fullTextBuilder.toString(),
             toolExecutionRequests = allToolExecutionRequests,
             modelName = config.modelName
         )
     }
 
-    private fun parseResponse(response: GenerateContentResponse): LlmResponse {
-        var text = response.text() ?: ""
-        val toolExecutionRequests = mutableListOf<ToolExecutionRequest>()
-
-        val candidatesOpt = response.candidates()
+        private fun extractFunctionCalls(candidatesOpt: Optional<out List<com.google.genai.types.Candidate>>?): List<ToolExecutionRequest> {
+        val requests = mutableListOf<ToolExecutionRequest>()
         if (candidatesOpt != null && candidatesOpt.isPresent()) {
             val candidateList = candidatesOpt.get()
             if (candidateList.isNotEmpty()) {
@@ -285,13 +253,21 @@ class GeminiCloudProvider(
                                     .name(name)
                                     .arguments(argsJson)
                                     .build()
-                                toolExecutionRequests.add(request)
+                                requests.add(request)
                             }
                         }
                     }
                 }
             }
         }
+        return requests
+    }
+
+    private fun parseResponse(response: GenerateContentResponse): LlmResponse {
+        var text = response.text() ?: ""
+        val toolExecutionRequests = mutableListOf<ToolExecutionRequest>()
+
+        toolExecutionRequests.addAll(extractFunctionCalls(response.candidates()))
 
         return LlmResponse(
             text = text,
