@@ -1,0 +1,35 @@
+--- app/src/main/java/io/agents/pokeclaw/agent/FsmRecoveryManager.kt
++++ app/src/main/java/io/agents/pokeclaw/agent/FsmRecoveryManager.kt
+@@ -16,8 +16,7 @@
+ class FsmRecoveryManager {
+
+     data class UiState(
+-        val screenHash: Int,
+-        val actionCount: Int = 0 // Number of actions taken since this state was pushed
++        val screenHash: Int
+     )
+
+     private val stateStack = ArrayDeque<UiState>()
+@@ -35,16 +34,14 @@
+         // If the screen hash is the same as the top of the stack, we are in the same state,
+         // just increment action count.
+         val top = stateStack.peekLast()
+-        if (top != null && top.screenHash == screenHash) {
+-            stateStack.removeLast()
+-            stateStack.addLast(top.copy(actionCount = top.actionCount + 1))
+-        } else {
++        if (top == null || top.screenHash != screenHash) {
+             // New state
+             stateStack.addLast(UiState(screenHash))
+             if (stateStack.size > MAX_STACK_SIZE) {
+                 stateStack.removeFirst()
+             }
+-        }
+-        // Reset consecutive rollbacks if we reached a new state successfully
+-        if (consecutiveRollbacks > 0 && System.currentTimeMillis() - lastRollbackTime > 5000) {
+-            consecutiveRollbacks = 0
++
++            // Reset consecutive rollbacks if we reached a new state successfully
++            consecutiveRollbacks = 0
+         }
+     }

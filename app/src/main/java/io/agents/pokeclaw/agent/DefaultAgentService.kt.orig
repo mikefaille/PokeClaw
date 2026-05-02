@@ -827,14 +827,8 @@ class DefaultAgentService : AgentService {
                         return
                     }
                     else -> {
-                        val rollbackMsg = fsmRecoveryManager.checkAndRollback(lastScreenHash, detection.signal)
-                        if (rollbackMsg != null) {
-                            XLog.w(TAG, "FSM Rollback at iteration $iterations: ${detection.signal.description}")
-                            messages.add(UserMessage.from(rollbackMsg))
-                        } else {
-                            XLog.w(TAG, "StuckDetector ${detection.level} at iteration $iterations: ${detection.signal.description}")
-                            messages.add(UserMessage.from(detection.recoveryHint))
-                        }
+                        XLog.w(TAG, "StuckDetector ${detection.level} at iteration $iterations: ${detection.signal.description}")
+                        messages.add(UserMessage.from(detection.recoveryHint))
                     }
                 }
             }

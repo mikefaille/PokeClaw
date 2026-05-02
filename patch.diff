@@ -1,0 +1,19 @@
+--- app/src/main/java/io/agents/pokeclaw/agent/DefaultAgentService.kt
++++ app/src/main/java/io/agents/pokeclaw/agent/DefaultAgentService.kt
+@@ -825,8 +825,14 @@
+                         return
+                     }
+                     else -> {
+-                        XLog.w(TAG, "StuckDetector ${detection.level} at iteration $iterations: ${detection.signal.description}")
+-                        messages.add(UserMessage.from(detection.recoveryHint))
++                        val rollbackMsg = fsmRecoveryManager.checkAndRollback(lastScreenHash, detection.signal)
++                        if (rollbackMsg != null) {
++                            XLog.w(TAG, "FSM Rollback at iteration $iterations: ${detection.signal.description}")
++                            messages.add(UserMessage.from(rollbackMsg))
++                        } else {
++                            XLog.w(TAG, "StuckDetector ${detection.level} at iteration $iterations: ${detection.signal.description}")
++                            messages.add(UserMessage.from(detection.recoveryHint))
++                        }
+                     }
+                 }
+             }
