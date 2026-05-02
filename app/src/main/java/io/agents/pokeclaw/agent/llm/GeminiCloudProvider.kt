@@ -20,6 +20,7 @@ import com.google.genai.types.Schema
 import com.google.genai.types.GenerateContentConfig
 import com.google.genai.types.GenerateContentResponse
 import io.agents.pokeclaw.utils.XLog
+import com.google.genai.types.Type
 import java.util.Optional
 
 class GeminiCloudProvider(
@@ -38,21 +39,34 @@ class GeminiCloudProvider(
 
     private fun convertMessages(messages: List<ChatMessage>): List<Content> {
         val contents = mutableListOf<Content>()
+        var currentRole: String? = null
+        var currentParts = mutableListOf<Part>()
 
         for (msg in messages) {
+            if (msg is SystemMessage) continue
+
+            val msgRole = when (msg) {
+                is UserMessage -> "user"
+                is AiMessage -> "model"
+                is ToolExecutionResultMessage -> "user"
+                else -> "user"
+            }
+
+            if (currentRole != null && currentRole != msgRole) {
+                contents.add(Content.builder().role(currentRole).parts(currentParts).build())
+                currentParts = mutableListOf<Part>()
+            }
+            currentRole = msgRole
+
             when (msg) {
-                is SystemMessage -> continue
                 is UserMessage -> {
-                    val parts = mutableListOf<Part>()
                     if (msg.hasSingleText()) {
-                        parts.add(Part.builder().text(msg.singleText()).build())
+                        currentParts.add(Part.builder().text(msg.singleText()).build())
                     }
-                    contents.add(Content.builder().role("user").parts(parts).build())
                 }
                 is AiMessage -> {
-                    val parts = mutableListOf<Part>()
                     if (msg.text() != null && msg.text().isNotEmpty()) {
-                        parts.add(Part.builder().text(msg.text()).build())
+                        currentParts.add(Part.builder().text(msg.text()).build())
                     }
                     if (msg.toolExecutionRequests() != null) {
                         for (req in msg.toolExecutionRequests()) {
@@ -61,7 +75,7 @@ class GeminiCloudProvider(
                             } catch (e: Exception) {
                                 emptyMap<String, Any>()
                             }
-                            parts.add(
+                            currentParts.add(
                                 Part.builder().functionCall(
                                     FunctionCall.builder()
                                         .name(req.name())
@@ -71,11 +85,9 @@ class GeminiCloudProvider(
                             )
                         }
                     }
-                    contents.add(Content.builder().role("model").parts(parts).build())
                 }
                 is ToolExecutionResultMessage -> {
-                    val parts = mutableListOf<Part>()
-                    parts.add(
+                    currentParts.add(
                         Part.builder().functionResponse(
                             FunctionResponse.builder()
                                 .name(msg.toolName())
@@ -83,10 +95,14 @@ class GeminiCloudProvider(
                                 .build()
                         ).build()
                     )
-                    contents.add(Content.builder().role("user").parts(parts).build())
                 }
             }
         }
+
+        if (currentRole != null && currentParts.isNotEmpty()) {
+            contents.add(Content.builder().role(currentRole).parts(currentParts).build())
+        }
+
         return contents
     }
 
@@ -104,7 +120,16 @@ class GeminiCloudProvider(
                 if (propertiesMap != null && propertiesMap.isNotEmpty()) {
                     val convertedProperties = mutableMapOf<String, Schema>()
                     for ((key, propSchema) in propertiesMap) {
-                        val geminiType = propSchema.type().uppercase()
+                        val typeName = propSchema.javaClass.simpleName
+                        val geminiType = when {
+                            typeName.contains("String") -> "STRING"
+                            typeName.contains("Integer") -> "INTEGER"
+                            typeName.contains("Number") -> "NUMBER"
+                            typeName.contains("Boolean") -> "BOOLEAN"
+                            typeName.contains("Array") -> "ARRAY"
+                            typeName.contains("Object") -> "OBJECT"
+                            else -> "STRING"
+                        }
 
                         val description = try {
                             val descMethod = propSchema.javaClass.getMethod("description")
