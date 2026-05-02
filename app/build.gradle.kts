@@ -98,6 +98,7 @@ android {
     packaging {
         resources {
             excludes += setOf(
+                "META-INF/INDEX.LIST",
                 "META-INF/DEPENDENCIES",
                 "META-INF/LICENSE",
                 "META-INF/LICENSE.txt",
@@ -109,6 +110,7 @@ android {
 }
 
 dependencies {
+    implementation(libs.google.genai)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
     implementation(libs.material)
