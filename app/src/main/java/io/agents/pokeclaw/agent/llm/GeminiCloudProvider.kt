@@ -38,21 +38,36 @@ class GeminiCloudProvider(
 
     private fun convertMessages(messages: List<ChatMessage>): List<Content> {
         val contents = mutableListOf<Content>()
+        var currentRole: String? = null
+        var currentParts = mutableListOf<Part>()
 
         for (msg in messages) {
+            if (msg is SystemMessage) continue
+
+            val msgRole = when (msg) {
+                is UserMessage -> "user"
+                is AiMessage -> "model"
+                is ToolExecutionResultMessage -> "user"
+                else -> "user"
+            }
+
+            if (currentRole != null && currentRole != msgRole) {
+                if (currentParts.isNotEmpty()) {
+                    contents.add(Content.builder().role(currentRole).parts(currentParts).build())
+                }
+                currentParts = mutableListOf<Part>()
+            }
+            currentRole = msgRole
+
             when (msg) {
-                is SystemMessage -> continue
                 is UserMessage -> {
-                    val parts = mutableListOf<Part>()
                     if (msg.hasSingleText()) {
-                        parts.add(Part.builder().text(msg.singleText()).build())
+                        currentParts.add(Part.builder().text(msg.singleText()).build())
                     }
-                    contents.add(Content.builder().role("user").parts(parts).build())
                 }
                 is AiMessage -> {
-                    val parts = mutableListOf<Part>()
                     if (msg.text() != null && msg.text().isNotEmpty()) {
-                        parts.add(Part.builder().text(msg.text()).build())
+                        currentParts.add(Part.builder().text(msg.text()).build())
                     }
                     if (msg.toolExecutionRequests() != null) {
                         for (req in msg.toolExecutionRequests()) {
@@ -61,7 +76,7 @@ class GeminiCloudProvider(
                             } catch (e: Exception) {
                                 emptyMap<String, Any>()
                             }
-                            parts.add(
+                            currentParts.add(
                                 Part.builder().functionCall(
                                     FunctionCall.builder()
                                         .name(req.name())
@@ -71,11 +86,9 @@ class GeminiCloudProvider(
                             )
                         }
                     }
-                    contents.add(Content.builder().role("model").parts(parts).build())
                 }
                 is ToolExecutionResultMessage -> {
-                    val parts = mutableListOf<Part>()
-                    parts.add(
+                    currentParts.add(
                         Part.builder().functionResponse(
                             FunctionResponse.builder()
                                 .name(msg.toolName())
@@ -83,10 +96,14 @@ class GeminiCloudProvider(
                                 .build()
                         ).build()
                     )
-                    contents.add(Content.builder().role("user").parts(parts).build())
                 }
             }
         }
+
+        if (currentRole != null && currentParts.isNotEmpty()) {
+            contents.add(Content.builder().role(currentRole).parts(currentParts).build())
+        }
+
         return contents
     }
 
@@ -104,7 +121,23 @@ class GeminiCloudProvider(
                 if (propertiesMap != null && propertiesMap.isNotEmpty()) {
                     val convertedProperties = mutableMapOf<String, Schema>()
                     for ((key, propSchema) in propertiesMap) {
-                        val geminiType = propSchema.type().uppercase()
+                        val geminiType = try {
+                            val typeMethod = propSchema.javaClass.getMethod("type")
+                            val typeEnum = typeMethod.invoke(propSchema)
+                            typeEnum.toString().uppercase()
+                        } catch (e: Exception) {
+                            val typeName = propSchema.javaClass.simpleName
+                            when {
+                                typeName == "JsonStringSchemaProperty" -> "STRING"
+                                typeName == "JsonIntegerSchemaProperty" -> "INTEGER"
+                                typeName == "JsonNumberSchemaProperty" -> "NUMBER"
+                                typeName == "JsonBooleanSchemaProperty" -> "BOOLEAN"
+                                typeName == "JsonArraySchemaProperty" -> "ARRAY"
+                                typeName == "JsonObjectSchemaProperty" -> "OBJECT"
+                                typeName == "JsonEnumSchemaProperty" -> "STRING"
+                                else -> "STRING"
+                            }
+                        }
 
                         val description = try {
                             val descMethod = propSchema.javaClass.getMethod("description")
