@@ -84,12 +84,16 @@ class GeminiCloudProvider(
                             val fcBuilder = FunctionCall.builder()
                                 .name(req.name())
                                 .args(argsMap)
-                            if (callId.isNotEmpty()) {
+                            if (callId.isNotBlank()) {
                                 fcBuilder.id(callId)
                             }
                             val partBuilder = Part.builder().functionCall(fcBuilder.build())
-                            if (tsBase64 != null) {
-                                partBuilder.thoughtSignature(java.util.Base64.getDecoder().decode(tsBase64))
+                            if (!tsBase64.isNullOrBlank()) {
+                                try {
+                                    partBuilder.thoughtSignature(java.util.Base64.getDecoder().decode(tsBase64))
+                                } catch (e: Exception) {
+                                    XLog.w(TAG, "Failed to decode thoughtSignature from ID: $rawId")
+                                }
                             }
                             currentParts.add(partBuilder.build())
                         }
@@ -102,7 +106,7 @@ class GeminiCloudProvider(
                     val frBuilder = FunctionResponse.builder()
                         .name(msg.toolName())
                         .response(mapOf("result" to msg.text()))
-                    if (callId.isNotEmpty()) {
+                    if (callId.isNotBlank()) {
                         frBuilder.id(callId)
                     }
                     currentParts.add(
@@ -288,8 +292,8 @@ class GeminiCloudProvider(
                                 val tsOpt = part.thoughtSignature()
                                 val tsBase64 = if (tsOpt != null && tsOpt.isPresent()) java.util.Base64.getEncoder().encodeToString(tsOpt.get()) else null
                                 val callIdOpt = funcCall.id()
-                                val callId = if (callIdOpt != null && callIdOpt.isPresent()) callIdOpt.get() else "call_" + System.currentTimeMillis()
-                                val compositeId = if (tsBase64 != null) "$callId|$tsBase64" else callId
+                                val callId = if (callIdOpt != null && callIdOpt.isPresent()) callIdOpt.get() else java.util.UUID.randomUUID().toString()
+                                val compositeId = if (!tsBase64.isNullOrBlank()) "$callId|$tsBase64" else callId
 
                                 val request = ToolExecutionRequest.builder()
                                     .id(compositeId)
