@@ -37,14 +37,16 @@ class FsmRecoveryManager {
     fun recordState(screenHash: Int) {
         val top = stateStack.peekLast()
         if (top == null || top.screenHash != screenHash) {
+            // Only reset if we reached a state we haven't seen in the stack (making actual forward progress)
+            if (stateStack.none { it.screenHash == screenHash }) {
+                consecutiveRollbacks = 0
+            }
+
             // New state
             stateStack.addLast(UiState(screenHash))
             if (stateStack.size > MAX_STACK_SIZE) {
                 stateStack.removeFirst()
             }
-
-            // Reset consecutive rollbacks if we reached a new state successfully
-            consecutiveRollbacks = 0
         }
     }
 
@@ -52,7 +54,7 @@ class FsmRecoveryManager {
      * Checks if we need to perform an autonomous rollback and executes it if necessary.
      * Returns a string describing the action taken, or null if no action was taken.
      */
-    fun checkAndRollback(currentScreenHash: Int, stuckDetectionSignal: StuckDetector.Signal?): String? {
+    fun checkAndRollback(stuckDetectionSignal: StuckDetector.Signal?): String? {
         if (stuckDetectionSignal == null) return null
 
         val now = System.currentTimeMillis()
