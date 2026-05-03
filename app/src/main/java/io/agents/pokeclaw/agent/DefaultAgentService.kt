@@ -539,6 +539,7 @@ class DefaultAgentService : AgentService {
         var previousScreenTexts: Set<String> = emptySet()
         val tokenMonitor = TokenMonitor(config.modelName)
         val stuckDetector = StuckDetector()
+        val fsmRecoveryManager = FsmRecoveryManager()
         val taskBudget = TaskBudget.fromSettings()
         var softLimitWarned = false
         var consecutiveNoToolCalls = 0
@@ -547,6 +548,7 @@ class DefaultAgentService : AgentService {
             iterations++
             callback.onLoopStart(iterations)
 
+            var lastToolError: String? = null
             // Compress history messages before sending to save tokens
             compressHistoryForSend(messages)
 
@@ -721,6 +723,7 @@ class DefaultAgentService : AgentService {
                 emailComposeGuard.recordToolAttempt(toolName)
 
                 val result = ToolRegistry.getInstance().executeTool(toolName, params)
+                if (lastToolError == null) lastToolError = result.error
                 val paramsString = if (params.isEmpty()) "" else params.toString()
                 callback.onToolResult(iterations, toolName, displayName, paramsString, result)
                 if (result.isSuccess) {
@@ -799,17 +802,13 @@ class DefaultAgentService : AgentService {
                 messages.add(ToolExecutionResultMessage.from(toolRequest, combinedResultData))
                 XLog.d(TAG, "displayName:$displayName toolName:$toolName")
             }
-
             // Stuck detection (5-signal, 3-level recovery)
             val lastAction = llmResponse.toolExecutionRequests?.firstOrNull()?.let {
                 "${it.name()}:${it.arguments()?.take(50)}"
             } ?: ""
             val screenDiffCount = (previousScreenTexts as? Set<*>)?.size ?: 0
-            val toolError = llmResponse.toolExecutionRequests?.firstOrNull()?.let { req ->
-                val result = ToolRegistry.getInstance().getTool(req.name() ?: "")
-                null // error tracked per-tool above; simplified here
-            }
-            val detection = stuckDetector.record(lastAction, lastScreenHash, screenDiffCount, null)
+            fsmRecoveryManager.recordState(lastScreenHash)
+            val detection = stuckDetector.record(lastAction, lastScreenHash, screenDiffCount, lastToolError)
             if (detection != null) {
                 when (detection.level) {
                     StuckDetector.RecoveryLevel.AUTO_KILL -> {
@@ -825,8 +824,14 @@ class DefaultAgentService : AgentService {
                         return
                     }
                     else -> {
-                        XLog.w(TAG, "StuckDetector ${detection.level} at iteration $iterations: ${detection.signal.description}")
-                        messages.add(UserMessage.from(detection.recoveryHint))
+                        val rollbackMsg = fsmRecoveryManager.checkAndRollback(detection.signal)
+                        if (rollbackMsg != null) {
+                            XLog.w(TAG, "FSM Rollback at iteration $iterations: ${detection.signal.description}")
+                            messages.add(UserMessage.from(rollbackMsg))
+                        } else {
+                            XLog.w(TAG, "StuckDetector ${detection.level} at iteration $iterations: ${detection.signal.description}")
+                            messages.add(UserMessage.from(detection.recoveryHint))
+                        }
                     }
                 }
             }
