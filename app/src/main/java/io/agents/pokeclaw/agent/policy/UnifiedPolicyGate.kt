@@ -41,7 +41,7 @@ class DefaultUnifiedPolicyGate : UnifiedPolicyGate {
 
         // Local evaluation logic based on tool risk
         if (descriptor.risk == ToolRisk.HIGH) {
-            return PolicyDecision.RequiresConfirmation("High risk action requires confirmation: \${descriptor.description}")
+            return PolicyDecision.RequiresConfirmation("High risk action requires confirmation: ${descriptor.description}")
         }
 
         return PolicyDecision.Allowed

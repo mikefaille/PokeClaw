@@ -17,7 +17,7 @@ object GeminiToolCatalogSerializer {
                     declarations.add(tool.declaration)
                 }
                 else -> {
-                    XLog.w(TAG, "Unsupported tool declaration type: \${tool::class.java.name}")
+                    XLog.w(TAG, "Unsupported tool declaration type: ${tool::class.java.name}")
                 }
             }
         }

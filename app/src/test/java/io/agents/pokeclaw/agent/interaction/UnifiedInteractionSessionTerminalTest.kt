@@ -63,6 +63,6 @@ class UnifiedInteractionSessionTerminalTest {
         )
 
         val result = session.runInteraction(task)
-        assertTrue("Expected Blocked, got \$result", result is TaskResult.Blocked)
+        assertTrue("Expected Blocked, got $result", result is TaskResult.Blocked)
     }
 }

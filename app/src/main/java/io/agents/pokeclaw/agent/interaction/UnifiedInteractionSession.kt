@@ -90,7 +90,7 @@ class UnifiedInteractionSession(
                         ToolStatus.BLOCKED -> TaskResult.Blocked(result.error?.message ?: "Action blocked")
                         ToolStatus.CANCELLED -> TaskResult.Cancelled("Action cancelled")
                         ToolStatus.FAILED -> TaskResult.Failure(result.error?.message ?: "Action failed")
-                        else -> TaskResult.Failure("Terminal error: \${result.status}")
+                        else -> TaskResult.Failure("Terminal error: ${result.status}")
                     }
                 }
             }
