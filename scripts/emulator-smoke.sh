@@ -71,9 +71,9 @@ echo "No fatal exceptions in crash buffer."
 echo "::endgroup::"
 
 echo "::group::Capture logcat artifact"
-adb logcat -d > "logcat-full-api${API_LEVEL}.txt"
-adb shell screencap -p "/sdcard/screen-api${API_LEVEL}.png"
-adb pull "/sdcard/screen-api${API_LEVEL}.png" .
+adb logcat -d > "logcat-full-api${API_LEVEL}.txt" || true
+adb shell screencap -p "/sdcard/screen-api${API_LEVEL}.png" || true || true
+adb pull "/sdcard/screen-api${API_LEVEL}.png" . || true || true
 echo "::endgroup::"
 
 echo "::group::Smoke test summary"
