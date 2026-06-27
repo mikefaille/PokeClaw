@@ -48,7 +48,7 @@ class TaskOrchestrator(
     // ==================== Agent Lifecycle ====================
 
     fun initAgent() {
-        agentService = AgentServiceFactory.create()
+        agentService = AgentServiceFactory.create(agentConfigProvider().provider)
         try {
             agentService.initialize(agentConfigProvider())
         } catch (e: Exception) {
@@ -65,7 +65,7 @@ class TaskOrchestrator(
                 true
             } else {
                 XLog.w(TAG, "AgentService not initialized, initializing with new config")
-                agentService = AgentServiceFactory.create()
+                agentService = AgentServiceFactory.create(agentConfigProvider().provider)
                 agentService.initialize(config)
                 true
             }
@@ -231,7 +231,7 @@ class TaskOrchestrator(
         if (!::agentService.isInitialized) {
             XLog.e(TAG, "AgentService not initialized, attempting to initialize")
             try {
-                agentService = AgentServiceFactory.create()
+                agentService = AgentServiceFactory.create(agentConfigProvider().provider)
                 agentService.initialize(agentConfigProvider())
             } catch (e: Exception) {
                 XLog.e(TAG, "Failed to initialize AgentService", e)
