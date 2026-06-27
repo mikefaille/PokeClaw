@@ -19,7 +19,7 @@ interface GeminiInteraction {
 interface GeminiClient {
     suspend fun createInteraction(
         model: String,
-        previousInteractionId: String?,
+
         input: List<InteractionInput>,
         tools: List<GeminiToolDeclaration>,
         systemInstruction: String

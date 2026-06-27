@@ -16,10 +16,6 @@ sealed class TaskResult {
     data object IterationLimitReached : TaskResult()
 }
 
-interface ToolRegistryInterface {
-    fun resolve(name: String): ToolBinding?
-    fun getInternalTool(name: String): PokeClawTool?
-}
 
 class UnifiedInteractionSession(
     private val taskRuntime: TaskRuntime,
@@ -28,14 +24,14 @@ class UnifiedInteractionSession(
     private val promptFactory: PromptFactory,
     private val stepNormalizer: InteractionStepNormalizer,
     private val interactionSerializer: InteractionResultSerializer,
-    private val registry: ToolRegistryInterface,
+    private val registry: io.agents.pokeclaw.agent.tools.UnifiedToolRegistry,
     private val policyGate: UnifiedPolicyGate,
     private val confirmationCoordinator: ConfirmationCoordinator,
     private val executionContext: ToolExecutionContext
 ) {
 
     suspend fun runInteraction(task: UserTask): TaskResult {
-        var previousInteractionId: String? = null
+
         val accumulatedTranscript = mutableListOf<InteractionInput>(UserTextInput(task.prompt))
 
         while (taskRuntime.canContinue()) {
@@ -47,13 +43,13 @@ class UnifiedInteractionSession(
 
             val interaction = geminiClient.createInteraction(
                 model = "gemini-3.5-flash",
-                previousInteractionId = previousInteractionId,
+
                 input = accumulatedTranscript,
                 tools = exposedTools,
                 systemInstruction = promptFactory.create(task)
             )
 
-            previousInteractionId = interaction.id
+
 
             val steps = stepNormalizer.normalize(interaction.steps)
 

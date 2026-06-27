@@ -11,7 +11,9 @@ data class GeminiFunctionResultInput(
     val toolName: String,
     val output: JsonObject,
     val status: String,
-    val error: JsonObject?
+    val error: JsonObject?,
+    val metadata: Map<String, com.google.gson.JsonElement>,
+    val snapshot: io.agents.pokeclaw.agent.interaction.EnvironmentSnapshot?
 ) : InteractionInput
 
 class GeminiFunctionResultSerializer : InteractionResultSerializer {
@@ -28,7 +30,9 @@ class GeminiFunctionResultSerializer : InteractionResultSerializer {
             toolName = result.toolName,
             output = result.output,
             status = result.status.name,
-            error = errorJson
+            error = errorJson,
+            metadata = result.metadata,
+            snapshot = result.snapshot
         )
     }
 }

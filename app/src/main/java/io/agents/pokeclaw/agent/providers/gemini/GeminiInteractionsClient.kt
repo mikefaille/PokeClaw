@@ -20,7 +20,6 @@ class GeminiInteractionsClient(private val apiKey: String) : GeminiClient {
 
     override suspend fun createInteraction(
         model: String,
-        previousInteractionId: String?,
         input: List<InteractionInput>,
         tools: List<GeminiToolDeclaration>,
         systemInstruction: String
@@ -53,6 +52,8 @@ class GeminiInteractionsClient(private val apiKey: String) : GeminiClient {
                     if (currentRole != "model") flushParts()
                     currentRole = "model"
                     val argsMap = com.google.gson.Gson().fromJson(item.call.arguments, Map::class.java) as Map<String, Any>
+
+                    // We map the explicit structure to preserve correlation IDs locally
                     currentParts.add(Part.builder().functionCall(
                         FunctionCall.builder()
                             .name(item.call.name)
@@ -70,7 +71,13 @@ class GeminiInteractionsClient(private val apiKey: String) : GeminiClient {
                     if (item.error != null) {
                          responseMap["error"] = com.google.gson.Gson().fromJson(item.error, Map::class.java) as Map<String, Any>
                     }
-
+                    if (item.metadata.isNotEmpty()) {
+                        responseMap["metadata"] = com.google.gson.Gson().fromJson(com.google.gson.Gson().toJson(item.metadata), Map::class.java) as Map<String, Any>
+                    }
+                    if (item.snapshot != null) {
+                        responseMap["snapshot_captured"] = true
+                    }
+                    // For correlational binding, Gemini matches by `name` usually if ID missing.
                     currentParts.add(Part.builder().functionResponse(
                         FunctionResponse.builder()
                             .name(item.toolName)
@@ -93,7 +100,7 @@ class GeminiInteractionsClient(private val apiKey: String) : GeminiClient {
         val response = client.models.generateContent(model, contents, configBuilder.build())
 
         return object : GeminiInteraction {
-            override val id: String = previousInteractionId ?: UUID.randomUUID().toString()
+            override val id: String = UUID.randomUUID().toString()
             override val steps: List<Any> = listOf(response)
         }
     }

@@ -16,7 +16,7 @@ class UnifiedInteractionSessionTest {
         val task = UserTask("id", "test prompt", InteractionCapabilities.DEFAULT_GEMINI)
         val runtime = DefaultTaskRuntime(10)
         val policyGate = DefaultUnifiedPolicyGate()
-        val registry = object : ToolRegistryInterface {
+        val registry = object : io.agents.pokeclaw.agent.tools.UnifiedToolRegistry { override fun registerAlias(e: String, i: String) {} override fun registerBinding(b: ToolBinding) {}
             override fun resolve(name: String): ToolBinding? {
                 if (name == "finish") {
                     return ToolBinding("finish", "finish_internal", object: ToolArgumentAdapter {
@@ -36,7 +36,7 @@ class UnifiedInteractionSessionTest {
             }
         }
         val geminiClient = object : GeminiClient {
-            override suspend fun createInteraction(model: String, previousInteractionId: String?, input: List<InteractionInput>, tools: List<GeminiToolDeclaration>, systemInstruction: String): GeminiInteraction {
+            override suspend fun createInteraction(model: String, input: List<InteractionInput>, tools: List<GeminiToolDeclaration>, systemInstruction: String): GeminiInteraction {
                 return object : GeminiInteraction {
                     override val id = "123"
                     override val steps = emptyList<Any>()

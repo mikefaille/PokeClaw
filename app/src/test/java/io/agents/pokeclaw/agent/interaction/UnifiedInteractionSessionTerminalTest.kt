@@ -13,7 +13,7 @@ class UnifiedInteractionSessionTerminalTest {
     @Test
     fun testBlockedFailureMapsToTaskResult() = runBlocking {
         val task = UserTask("id", "test", InteractionCapabilities.DEFAULT_GEMINI)
-        val registry = object : ToolRegistryInterface {
+        val registry = object : io.agents.pokeclaw.agent.tools.UnifiedToolRegistry { override fun registerAlias(e: String, i: String) {} override fun registerBinding(b: ToolBinding) {}
             override fun resolve(name: String): ToolBinding? {
                 return ToolBinding("bad_tool", "bad_tool_internal", object: ToolArgumentAdapter {
                     override fun adapt(arguments: JsonObject) = arguments
@@ -29,7 +29,7 @@ class UnifiedInteractionSessionTerminalTest {
             }
         }
         val geminiClient = object : GeminiClient {
-            override suspend fun createInteraction(model: String, previousInteractionId: String?, input: List<InteractionInput>, tools: List<GeminiToolDeclaration>, systemInstruction: String): GeminiInteraction {
+            override suspend fun createInteraction(model: String, input: List<InteractionInput>, tools: List<GeminiToolDeclaration>, systemInstruction: String): GeminiInteraction {
                 return object : GeminiInteraction {
                     override val id = "123"
                     override val steps = emptyList<Any>()
