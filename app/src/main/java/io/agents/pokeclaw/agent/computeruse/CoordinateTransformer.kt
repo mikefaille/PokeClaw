@@ -8,13 +8,18 @@ interface CoordinateTransformer {
     fun transformToScreen(x: Int, y: Int): Point
 }
 
+// Data class for pure logic testing decoupled from Android SDK Point
+data class ScreenCoordinate(val x: Int, val y: Int)
+
 class DefaultCoordinateTransformer(
     private val screenWidth: Int,
     private val screenHeight: Int
 ) : CoordinateTransformer {
-    override fun transformToScreen(x: Int, y: Int): Point {
+
+    // Pure function logic extracted for direct testing
+    fun calculateScreenCoordinate(x: Int, y: Int): ScreenCoordinate {
         if (screenWidth <= 0 || screenHeight <= 0) {
-            return Point(0, 0)
+            return ScreenCoordinate(0, 0)
         }
 
         // Clamp to 1000 bounds
@@ -30,6 +35,11 @@ class DefaultCoordinateTransformer(
         val finalX = max(0, min(screenWidth - 1, targetX))
         val finalY = max(0, min(screenHeight - 1, targetY))
 
-        return Point(finalX, finalY)
+        return ScreenCoordinate(finalX, finalY)
+    }
+
+    override fun transformToScreen(x: Int, y: Int): Point {
+        val coord = calculateScreenCoordinate(x, y)
+        return Point(coord.x, coord.y)
     }
 }

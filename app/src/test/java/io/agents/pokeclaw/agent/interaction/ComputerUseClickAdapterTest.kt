@@ -4,6 +4,7 @@ import org.junit.Test
 import org.junit.Assert.*
 import io.agents.pokeclaw.agent.computeruse.ComputerUseClickAdapter
 import io.agents.pokeclaw.agent.computeruse.DefaultCoordinateTransformer
+import io.agents.pokeclaw.agent.computeruse.ScreenCoordinate
 import android.graphics.Point
 import com.google.gson.JsonObject
 
@@ -14,18 +15,15 @@ class ComputerUseClickAdapterTest {
         val transformer = object : io.agents.pokeclaw.agent.computeruse.CoordinateTransformer {
             override fun transformToScreen(x: Int, y: Int): Point {
                 val point = Point()
-                val w = 2000
-                val h = 3000
-                val targetX = (x * w) / 1000
-                val targetY = (y * h) / 1000
-                point.x = kotlin.math.max(0, kotlin.math.min(w - 1, targetX))
-                point.y = kotlin.math.max(0, kotlin.math.min(h - 1, targetY))
+                val logic = DefaultCoordinateTransformer(2000, 3000)
+                val coord = logic.calculateScreenCoordinate(x, y)
+                point.x = coord.x
+                point.y = coord.y
                 return point
             }
         }
         val adapter = ComputerUseClickAdapter(transformer)
 
-        // Case 1: Out of bounds high -> clamped to width-1, height-1
         val args1 = JsonObject().apply {
             addProperty("x", 1200)
             addProperty("y", 1500)
@@ -34,7 +32,6 @@ class ComputerUseClickAdapterTest {
         assertEquals(1999, res1.get("x").asInt)
         assertEquals(2999, res1.get("y").asInt)
 
-        // Case 2: Out of bounds low -> clamped to 0, 0
         val args2 = JsonObject().apply {
             addProperty("x", -50)
             addProperty("y", -10)
@@ -43,7 +40,6 @@ class ComputerUseClickAdapterTest {
         assertEquals(0, res2.get("x").asInt)
         assertEquals(0, res2.get("y").asInt)
 
-        // Case 3: In bounds
         val args3 = JsonObject().apply {
             addProperty("x", 500)
             addProperty("y", 500)
@@ -55,5 +51,24 @@ class ComputerUseClickAdapterTest {
         assertEquals("keepme", res3.get("other").asString)
     }
 
-    // Removed testTransformerDirectly due to Point stub exceptions. We verified transformer logic matches Mock above.
+    @Test
+    fun testTransformerDirectly() {
+        val transformer = DefaultCoordinateTransformer(2000, 3000)
+
+        val pointZero = transformer.calculateScreenCoordinate(0, 0)
+        assertEquals(0, pointZero.x)
+        assertEquals(0, pointZero.y)
+
+        val pointMax = transformer.calculateScreenCoordinate(1000, 1000)
+        assertEquals(1999, pointMax.x)
+        assertEquals(2999, pointMax.y)
+
+        val pointMid = transformer.calculateScreenCoordinate(500, 500)
+        assertEquals(1000, pointMid.x)
+        assertEquals(1500, pointMid.y)
+
+        val pointNegativeBounds = DefaultCoordinateTransformer(0, -10).calculateScreenCoordinate(500, 500)
+        assertEquals(0, pointNegativeBounds.x)
+        assertEquals(0, pointNegativeBounds.y)
+    }
 }
