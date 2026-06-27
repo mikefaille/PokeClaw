@@ -3,7 +3,7 @@
 
 package io.agents.pokeclaw.agent
 
-enum class LlmProvider { OPENAI, ANTHROPIC, GOOGLE, LOCAL, GEMINI_UNIFIED }
+enum class LlmProvider { OPENAI, ANTHROPIC, GOOGLE, LOCAL }
 
 data class AgentConfig(
     val apiKey: String,

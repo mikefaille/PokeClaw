@@ -6,11 +6,5 @@ package io.agents.pokeclaw.agent
 object AgentServiceFactory {
 
     @JvmStatic
-    fun create(provider: LlmProvider? = null): AgentService {
-        return if (provider == LlmProvider.GEMINI_UNIFIED) {
-            UnifiedAgentService()
-        } else {
-            DefaultAgentService()
-        }
-    }
+    fun create(): AgentService = DefaultAgentService()
 }

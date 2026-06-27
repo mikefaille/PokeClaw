@@ -21,7 +21,6 @@ object LlmClientFactory {
             LlmProvider.ANTHROPIC -> AnthropicLlmClient(config, httpClientBuilder)
             LlmProvider.GOOGLE -> GeminiCloudProvider(config)
             LlmProvider.LOCAL -> LocalLlmClient(config)
-            LlmProvider.GEMINI_UNIFIED -> throw UnsupportedOperationException("GEMINI_UNIFIED does not use legacy LlmClient")
         }
     }
 }
