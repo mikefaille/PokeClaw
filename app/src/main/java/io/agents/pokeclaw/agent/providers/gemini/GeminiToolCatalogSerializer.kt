@@ -2,14 +2,26 @@ package io.agents.pokeclaw.agent.providers.gemini
 
 import com.google.genai.types.Tool
 import com.google.genai.types.FunctionDeclaration
-import com.google.genai.types.Schema
 import io.agents.pokeclaw.agent.interaction.GeminiToolDeclaration
+import io.agents.pokeclaw.utils.XLog
 
-// Implements serialization of generic tool declarations into Gemini-specific `Tool` format
 object GeminiToolCatalogSerializer {
+    private const val TAG = "GeminiToolCatalog"
+
     fun serialize(tools: List<GeminiToolDeclaration>): List<Tool> {
-        // Assume GeminiToolDeclaration can provide FunctionDeclarations
-        val declarations = tools.filterIsInstance<GeminiFunctionDeclarationAdapter>().map { it.declaration }
+        val declarations = mutableListOf<FunctionDeclaration>()
+
+        for (tool in tools) {
+            when (tool) {
+                is GeminiFunctionDeclarationAdapter -> {
+                    declarations.add(tool.declaration)
+                }
+                else -> {
+                    XLog.w(TAG, "Unsupported tool declaration type: \${tool::class.java.name}")
+                }
+            }
+        }
+
         if (declarations.isEmpty()) return emptyList()
 
         return listOf(Tool.builder().functionDeclarations(declarations).build())

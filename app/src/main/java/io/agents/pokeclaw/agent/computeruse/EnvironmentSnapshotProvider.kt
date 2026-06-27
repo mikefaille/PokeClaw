@@ -31,7 +31,7 @@ class DefaultEnvironmentSnapshotProvider : EnvironmentSnapshotProvider {
             val bitmap = service.takeScreenshot(3000L) // Wait up to 3s
             if (bitmap != null) {
                 val stream = ByteArrayOutputStream()
-                bitmap.compress(Bitmap.CompressFormat.JPEG, 70, stream) // JPEG is faster and smaller for LLM
+                bitmap.compress(Bitmap.CompressFormat.JPEG, 70, stream)
                 base64 = Base64.encodeToString(stream.toByteArray(), Base64.NO_WRAP)
             } else {
                 XLog.w(TAG, "Failed to capture screenshot")
@@ -40,19 +40,18 @@ class DefaultEnvironmentSnapshotProvider : EnvironmentSnapshotProvider {
             XLog.e(TAG, "Error capturing screenshot", e)
         }
 
-        // For viewTreeJson, we'd ideally dump the tree from ClawAccessibilityService
-        // Assuming there is a method for it, or we leave it empty for now
         var viewTreeJson: String? = null
         try {
-            // Attempt to get node info if service supports it
-            // This is a placeholder as the exact method depends on ClawAccessibilityService API
             val rootNode = service.rootInActiveWindow
             if (rootNode != null) {
-                 // In a full implementation, we would recursively serialize rootNode to JSON
                  viewTreeJson = "{\"status\": \"tree_dump_not_implemented_fully\"}"
             }
         } catch(e: Exception) {
             XLog.e(TAG, "Error capturing view tree", e)
+        }
+
+        if (base64 == null && viewTreeJson == null) {
+            return@withContext null
         }
 
         EnvironmentSnapshot(screenshotBase64 = base64, viewTreeJson = viewTreeJson)

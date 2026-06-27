@@ -4,6 +4,8 @@ interface GeminiToolDeclaration
 
 interface InteractionInput
 data class UserTextInput(val text: String) : InteractionInput
+data class ModelTextOutput(val text: String) : InteractionInput
+data class ModelToolCall(val call: UnifiedToolCall) : InteractionInput
 
 interface PromptFactory {
     fun create(task: UserTask): String
