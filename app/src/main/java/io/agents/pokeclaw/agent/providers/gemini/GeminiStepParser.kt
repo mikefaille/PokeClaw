@@ -9,7 +9,10 @@ import io.agents.pokeclaw.agent.interaction.ToolOrigin
 import io.agents.pokeclaw.agent.interaction.SafetyDecision
 import java.util.UUID
 
-class GeminiStepParser(private val gson: Gson = Gson()) : InteractionStepNormalizer {
+class GeminiStepParser(
+    private val gson: Gson = Gson(),
+    private val logWarning: (String, String) -> Unit = { tag, msg -> io.agents.pokeclaw.utils.XLog.w(tag, msg) }
+) : InteractionStepNormalizer {
     override fun normalize(steps: List<Any>): InteractionSteps {
         val toolCalls = mutableListOf<UnifiedToolCall>()
         val textBuilder = StringBuilder()
@@ -43,7 +46,8 @@ class GeminiStepParser(private val gson: Gson = Gson()) : InteractionStepNormali
                                             val callId = UUID.randomUUID().toString()
 
                                             // Action-level safety logic from candidate finish reason is imprecise.
-                                            // We defer to PokeClaw local policy gate for authoritative enforcement.
+                                            // If action-level provider safety metadata is unavailable, we explicitly state that
+                                            // PokeClaw local policy (UnifiedPolicyGate) remains authoritative.
                                             val safetyDecision: SafetyDecision? = null
 
                                             toolCalls.add(
@@ -72,7 +76,7 @@ class GeminiStepParser(private val gson: Gson = Gson()) : InteractionStepNormali
                     }
                 }
                 else -> {
-                    io.agents.pokeclaw.utils.XLog.w("GeminiStepParser", "Unsupported step type: ${step::class.java.name}")
+                    logWarning("GeminiStepParser", "Unsupported step type: ${step::class.java.name}")
                 }
             }
         }

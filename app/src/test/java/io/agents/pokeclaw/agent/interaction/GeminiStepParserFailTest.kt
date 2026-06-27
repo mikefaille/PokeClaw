@@ -6,20 +6,16 @@ import io.agents.pokeclaw.agent.providers.gemini.GeminiStepParser
 
 class GeminiStepParserFailTest {
     @Test
-    fun testUnsupportedStepIgnored() {
-        val parser = GeminiStepParser()
-        var steps: InteractionSteps? = null
-        try {
-            steps = parser.normalize(listOf("Some String that is not a Response"))
-        } catch (e: Exception) {
-            // Expected log failure in JUnit test
-        }
+    fun testUnsupportedStepIgnoredSafely() {
+        var warningLogged = false
+        val parser = GeminiStepParser(
+            logWarning = { tag, msg -> warningLogged = true }
+        )
 
-        // Assert we actually failed or safely passed depending on XLog mock state
-        // To make it meaningful, we check if steps was either unassigned (exception thrown) or safely empty.
-        if (steps != null) {
-            assertNull(steps.finalModelOutput())
-            assertTrue(steps.toolCalls().isEmpty())
-        }
+        val steps = parser.normalize(listOf("Some String that is not a Response"))
+
+        assertTrue("Parser should log a warning for unsupported steps", warningLogged)
+        assertNull("Final output should be null for invalid step", steps.finalModelOutput())
+        assertTrue("Tool calls should be empty for invalid step", steps.toolCalls().isEmpty())
     }
 }
