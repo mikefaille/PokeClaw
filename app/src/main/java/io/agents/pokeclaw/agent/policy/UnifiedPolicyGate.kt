@@ -3,12 +3,9 @@ package io.agents.pokeclaw.agent.policy
 import com.google.gson.JsonObject
 import io.agents.pokeclaw.agent.interaction.UnifiedToolCall
 import io.agents.pokeclaw.agent.tools.ToolDescriptor
-
-// Stub for UserTask
-interface UserTask {
-    val prompt: String
-    val capabilities: io.agents.pokeclaw.agent.interaction.InteractionCapabilities
-}
+import io.agents.pokeclaw.agent.interaction.UserTask
+import io.agents.pokeclaw.agent.interaction.SafetyDecision
+import io.agents.pokeclaw.agent.tools.ToolRisk
 
 sealed interface PolicyDecision {
     data object Allowed : PolicyDecision
@@ -32,6 +29,21 @@ class DefaultUnifiedPolicyGate : UnifiedPolicyGate {
         descriptor: ToolDescriptor,
         arguments: JsonObject
     ): PolicyDecision {
+
+        // Gemini server side evaluation override
+        if (call.safetyDecision == SafetyDecision.Blocked) {
+             return PolicyDecision.Blocked("Blocked by model safety decision")
+        }
+
+        if (call.safetyDecision == SafetyDecision.RequiresConfirmation) {
+            return PolicyDecision.RequiresConfirmation("The model requires confirmation for this action")
+        }
+
+        // Local evaluation logic based on tool risk
+        if (descriptor.risk == ToolRisk.HIGH) {
+            return PolicyDecision.RequiresConfirmation("High risk action requires confirmation: \${descriptor.description}")
+        }
+
         return PolicyDecision.Allowed
     }
 }

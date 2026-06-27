@@ -1,2 +1,2 @@
 #!/bin/bash
-find . -type f -name "*.kt" -exec grep -l "class Unified" {} +
+find . -type f -name "*.kt" -exec grep -l "class GeminiCloudProvider" {} +

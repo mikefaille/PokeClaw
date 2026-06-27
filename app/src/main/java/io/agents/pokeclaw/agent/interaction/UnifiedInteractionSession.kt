@@ -7,62 +7,10 @@ import io.agents.pokeclaw.agent.policy.ConfirmationCoordinator
 import io.agents.pokeclaw.agent.tools.ToolBinding
 import io.agents.pokeclaw.agent.tools.PokeClawTool
 import io.agents.pokeclaw.agent.tools.ToolExecutionContext
-import io.agents.pokeclaw.agent.policy.UserTask
 
-// Stubs for remaining dependencies in the loop
-interface TaskState
-interface TaskRuntime {
-    fun canContinue(): Boolean
-    val state: TaskState
-}
 sealed class TaskResult {
     data class Success(val output: String) : TaskResult()
     data object IterationLimitReached : TaskResult()
-}
-
-interface InteractionInput
-
-data class UserTextInput(val text: String) : InteractionInput
-
-interface GeminiToolDeclaration
-interface ToolExposurePolicy {
-    fun selectTools(
-        task: UserTask,
-        capabilities: InteractionCapabilities,
-        state: TaskState
-    ): List<GeminiToolDeclaration>
-}
-
-interface PromptFactory {
-    fun create(task: UserTask): String
-}
-
-interface GeminiInteraction {
-    val id: String
-    val steps: List<Any> // Simplified
-}
-
-interface GeminiClient {
-    suspend fun createInteraction(
-        model: String,
-        previousInteractionId: String?,
-        input: List<InteractionInput>,
-        tools: List<GeminiToolDeclaration>,
-        systemInstruction: String
-    ): GeminiInteraction
-}
-
-interface InteractionSteps {
-    fun finalModelOutput(): String?
-    fun toolCalls(): List<UnifiedToolCall>
-}
-
-interface InteractionStepNormalizer  {
-    fun normalize(steps: List<Any>): InteractionSteps
-}
-
-interface InteractionResultSerializer  {
-    fun serialize(result: UnifiedToolResult): InteractionInput
 }
 
 interface ToolRegistryInterface {
